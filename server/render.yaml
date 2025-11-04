@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: mystiq-ai
+    env: node
+    rootDir: .
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: APP_TOKEN
+        sync: false
+    autoDeploy: true
