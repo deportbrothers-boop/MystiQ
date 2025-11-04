@@ -1,4 +1,5 @@
 // Simple OpenAI proxy for MystiQ
+import 'dotenv/config';
 // - Exposes POST /generate (JSON) and POST /stream (SSE-like)
 // - Reads API key from env: OPENAI_API_KEY
 // - Never expose your API key in the mobile app; run this server on your machine
