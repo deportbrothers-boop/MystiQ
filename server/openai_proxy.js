@@ -11,6 +11,16 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
+// Optional: simple bearer token guard (register BEFORE routes)
+const APP_TOKEN = process.env.APP_TOKEN || '';
+app.use((req, res, next) => {
+  if (!APP_TOKEN) return next();
+  if (req.path === '/health') return next(); // allow health without auth
+  const auth = req.headers['authorization'] || '';
+  if (auth === `Bearer ${APP_TOKEN}`) return next();
+  return res.status(401).json({ error: 'unauthorized' });
+});
+
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function buildPrompt({ type, profile, inputs, locale }) {
@@ -92,11 +102,9 @@ app.post('/stream', async (req, res) => {
 
 const PORT = process.env.PORT || 8787;
 app.listen(PORT, () => console.log(`[mystiq-ai] server listening on ${PORT}`));
-// Optional: simple bearer token guard
-const APP_TOKEN = process.env.APP_TOKEN || '';
-app.use((req, res, next) => {
-  if (!APP_TOKEN) return next();
-  const auth = req.headers['authorization'] || '';
-  if (auth === `Bearer ${APP_TOKEN}`) return next();
-  return res.status(401).json({ error: 'unauthorized' });
+// (auth middleware is registered above, before routes)
+
+// Simple health check
+app.get('/health', (req, res) => {
+  res.json({ ok: true, model: (process.env.OPENAI_MODEL || 'gpt-4o-mini') });
 });
