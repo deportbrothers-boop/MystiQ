@@ -1,6 +1,6 @@
 {
-  "serverUrl": "http://127.0.0.1:8787/generate",
-  "streamUrl": "http://127.0.0.1:8787/stream",
+  "serverUrl": "https://https://mystiq-ai.onrender.com)/generate", 
+  "streamUrl": "https://https://mystiq-ai.onrender.com)/stream", 
   "model": "gpt-4o-mini",
   "appToken": "UZUN_RASTGELE_TOKEN"
 }
