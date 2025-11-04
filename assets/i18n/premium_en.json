@@ -1,0 +1,16 @@
+{
+  "action.from_gallery": "From gallery",
+  "action.from_camera": "From camera",
+  "pending.title.coffee": "Coffee Reading",
+  "pending.title.tarot": "Tarot",
+  "pending.title.palm": "Palm Reading",
+  "pending.title.astro": "Astrology",
+  "pending.title.dream": "Dream Interpretation",
+  "pending.title.default": "Reading",
+  "pending.body.coffee": "Your coffee reading is ready",
+  "pending.body.tarot": "Your tarot reading is ready",
+  "pending.body.palm": "Your palm reading is ready",
+  "pending.body.astro": "Your daily astrology is ready",
+  "pending.body.dream": "Your dream interpretation is ready",
+  "pending.body.default": "Your reading is ready"
+}

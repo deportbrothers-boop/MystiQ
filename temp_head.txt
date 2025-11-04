@@ -1,0 +1,250 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/access/access_gate.dart';
+import '../../../core/access/sku_costs.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import '../../../common/widgets/scanning_overlay.dart';
+import '../../../common/widgets/mystiq_background.dart';
+import '../../../core/analytics/analytics.dart';
+import '../../../core/readings/pending_readings_service.dart';
+import '../../../core/i18n/app_localizations.dart';
+import '../../../core/entitlements/entitlements_controller.dart';
+import 'package:mystiq/features/readings/coffee/_thumb_slot.dart';
+import '../../../core/ads/rewarded_helper.dart';
+
+class CoffeePage extends StatefulWidget {
+  const CoffeePage({super.key});
+  @override
+  State<CoffeePage> createState() => _CoffeePageState();
+}
+
+class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateMixin {
+  File? cup1;
+  File? cup2;
+  File? saucer;
+  bool scanning = false;
+  late final AnimationController _pulse;
+  String? _scheduledId;
+  Duration? _eta; // last selected ETA (10m or 5m)
+  bool _adUsed = false;
+  String _topic = 'general';
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startReading() async {
+    final selectedCount = [cup1, cup2, saucer].where((e) => e != null).length;
+    if (selectedCount == 0) {
+      final loc = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('coffee.snackbar.missing'))),
+      );
+      return;
+    }
+    await Analytics.log('reading_started', {'type': 'coffee'});
+    if (!mounted) return;
+    // Confirm coin spend (clear feedback to user)
+    final ent = context.read<EntitlementsController>();
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFF121018),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(AppLocalizations.of(context).t('coins.confirm.title') != 'coins.confirm.title'
+                  ? AppLocalizations.of(context).t('coins.confirm.title')
+                  : 'Coin harcanacak'),
+              const SizedBox(height: 8),
+              Text(AppLocalizations.of(context).t('coins.confirm.body') != 'coins.confirm.body'
+                  ? AppLocalizations.of(context).t('coins.confirm.body')
+                  : 'Bu kahve fal˝ iÁin 100 coin harcanacak. Bakiyeniz: ${ent.coins}'),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text(AppLocalizations.of(context).t('action.cancel')),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: Text(AppLocalizations.of(context).t('coins.confirm.spend') != 'coins.confirm.spend'
+                        ? AppLocalizations.of(context).t('coins.confirm.spend')
+                        : 'Harca (100)'),
+                  ),
+                ),
+              ])
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (confirmed != true) return;
+
+    // Coffee reading must be coin-only (no first-free, no ticket, no premium bypass)
+    final ok = await AccessGate.ensureCoinsOnlyOrPaywall(
+      context,
+      coinCost: SkuCosts.coffeeFast,
+    );
+    if (!ok) return;
+    if (!mounted) return;
+    // Offer rewarded ad to cut ETA from 10 -> 5 minutes
+    Duration eta = const Duration(minutes: 10);
+    bool adUsed = false;
+    try {
+      final choice = await showModalBottomSheet<String>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: const Color(0xFF121018),
+        builder: (_) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocalizations.of(context).t('coffee.fast.offer.title') != 'coffee.fast.offer.title'
+                      ? AppLocalizations.of(context).t('coffee.fast.offer.title')
+                      : 'Daha h˝zl˝ sonuÁ ister misiniz?',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  AppLocalizations.of(context).t('coffee.fast.offer.desc') != 'coffee.fast.offer.desc'
+                      ? AppLocalizations.of(context).t('coffee.fast.offer.desc')
+                      : 'Reklam izlerseniz kahve fal˝n˝z 10 dk yerine 5 dk iÁinde haz˝r olur.',
+                ),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.rocket_launch, size: 18),
+                      onPressed: () => Navigator.pop(context, 'ad'),
+                      label: Text(
+                        AppLocalizations.of(context).t('coffee.fast.watch_ad') != 'coffee.fast.watch_ad'
+                            ? AppLocalizations.of(context).t('coffee.fast.watch_ad')
+                            : 'Reklam izle (5 dk)'
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, 'normal'),
+                      child: Text(
+                        AppLocalizations.of(context).t('coffee.fast.normal') != 'coffee.fast.normal'
+                            ? AppLocalizations.of(context).t('coffee.fast.normal')
+                            : 'Normal (10 dk)'
+                      ),
+                    ),
+                  ),
+                ])
+              ],
+            ),
+          ),
+        ),
+      );
+      if (!mounted) return;
+      if (choice == 'ad') {
+        final ok = await RewardedAds.show(context: context);
+        if (!mounted) return;
+        if (ok) {
+          adUsed = true;
+          eta = const Duration(minutes: 5);
+          // Not strictly needed, but keep a daily counter
+          try { await RewardedAds.recordOne(); } catch (_) {}
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(
+                AppLocalizations.of(context).t('coffee.fast.thanks') != 'coffee.fast.thanks'
+                    ? AppLocalizations.of(context).t('coffee.fast.thanks')
+                    : 'Te≈üekk√ºrler! Falƒ±n 5 dk i√ßinde hazƒ±r olacak.'
+              )),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(
+                AppLocalizations.of(context).t('coffee.fast.ad_failed') != 'coffee.fast.ad_failed'
+                    ? AppLocalizations.of(context).t('coffee.fast.ad_failed')
+                    : 'Reklam g√∂sterilemedi. Normal hƒ±zda devam ediliyor (10 dk).'
+              )),
+            );
+          }
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final readyAt = DateTime.now().add(eta);
+      final extras = <String, dynamic>{
+        if (cup1 != null || cup2 != null || saucer != null)
+          'imagePaths': [if (cup1 != null) cup1!.path, if (cup2 != null) cup2!.path, if (saucer != null) saucer!.path],
+        'notifyOnly': true,\n        'topic': _topic,\n        'style': _style,\n
+        'topic': _topic,\n        'style': _style,\n        if (adUsed) 'adBoost': true,
+        'forceLocal': true,
+      };
+      final locale = Localizations.localeOf(context).languageCode;
+      PendingReadingsService.schedule(type: 'coffee', readyAt: readyAt, extras: extras, locale: locale)
+          .then((id) => _scheduledId = id);
+    } catch (_) {}
+    setState(() { scanning = true; _eta = eta; _adUsed = adUsed; });
+  }
+
+  Future<void> _pickFor(String slot, ImageSource source) async {
+    final x = await ImagePicker().pickImage(source: source);
+    if (x == null) return;
+    setState(() {
+      final f = File(x.path);
+      if (slot == 'cup1') cup1 = f;
+      if (slot == 'cup2') cup2 = f;
+      if (slot == 'saucer') saucer = f;
+    });
+  }
+
+  Future<String?> _chooseSlot() async {
+    return await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFF121018),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.coffee),
+              title: Text(AppLocalizations.of(context).t('coffee.modal.cup1')),
+              onTap: () => Navigator.pop(context, 'cup1'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.coffee),
+              title: Text(AppLocalizations.of(context).t('coffee.modal.cup2')),
+              onTap: () => Navigator.pop(context, 'cup2'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.emoji_food_beverage_outlined),
+              title: Text(AppLocalizations.of(context).t('coffee.modal.saucer')),
+              onTap: () => Navigator.pop(context, 'saucer'),
+            ),

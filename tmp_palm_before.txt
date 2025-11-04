@@ -1,0 +1,355 @@
+﻿import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../core/i18n/app_localizations.dart';
+import '../../../core/access/access_gate.dart';
+import '../../../core/access/sku_costs.dart';
+import '../../../core/analytics/analytics.dart';
+import '../../../core/readings/pending_readings_service.dart';
+import '../../../common/widgets/scanning_overlay.dart';
+import 'package:provider/provider.dart';
+import '../../../core/entitlements/entitlements_controller.dart';
+
+class PalmPage extends StatefulWidget {
+  const PalmPage({super.key});
+  @override
+  State<PalmPage> createState() => _PalmPageState();
+}
+
+class _PalmPageState extends State<PalmPage> {
+  File? image;
+  bool scanning = false;
+
+  double _goldAlpha = 0.35; // border color opacity
+  double _goldStroke = 1.8; // border width
+  int _starCount = 56; // background stars
+  String _style = 'practical'; // 'practical' | 'spiritual' | 'analytical'
+
+  Future<void> _pick(ImageSource source) async {
+    try {
+      final x = await ImagePicker().pickImage(source: source);
+      if (x != null) setState(() => image = File(x.path));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).t('error.permission_denied'))),
+      );
+    }
+  }
+
+  Future<void> _chooseAndPick() async {
+    final src = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFF121018),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.image),
+              title: Builder(builder: (ctx){
+                final t = AppLocalizations.of(ctx).t('action.from_gallery');
+                return Text(t != 'action.from_gallery' ? t : 'Galeriden');
+              }),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: Builder(builder: (ctx){
+                final t = AppLocalizations.of(ctx).t('action.from_camera');
+                return Text(t != 'action.from_camera' ? t : 'Kameradan');
+              }),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (src != null) await _pick(src);
+  }
+
+  void _openGoldTuner() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFF121018),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${AppLocalizations.of(context).t('palm.tuner.alpha')}: ${_goldAlpha.toStringAsFixed(2)}',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            Slider(value: _goldAlpha, min: 0, max: 1, divisions: 100, onChanged: (v) => setState(() => _goldAlpha = v)),
+            const SizedBox(height: 6),
+            Text(
+              '${AppLocalizations.of(context).t('palm.tuner.stroke')}: ${_goldStroke.toStringAsFixed(1)}',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            Slider(value: _goldStroke, min: 1, max: 4, divisions: 30, onChanged: (v) => setState(() => _goldStroke = v)),
+            const SizedBox(height: 6),
+            Text(
+              '${AppLocalizations.of(context).t('palm.tuner.stars')}: $_starCount',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            Slider(value: _starCount.toDouble(), min: 24, max: 120, divisions: 24, onChanged: (v) => setState(() => _starCount = v.round())),
+            Row(children: [
+              TextButton(
+                onPressed: () => setState(() {
+                  _goldAlpha = 0.35;
+                  _goldStroke = 1.8;
+                  _starCount = 56;
+                }),
+                child: Text(AppLocalizations.of(context).t('action.reset')),
+              ),
+              const Spacer(),
+              TextButton(onPressed: () => Navigator.pop(context), child: Text(AppLocalizations.of(context).t('action.close'))),
+            ])
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gold = Theme.of(context).colorScheme.primary;
+    final ent = context.watch<EntitlementsController>();
+    final displayCost = (ent.isPremium || !ent.firstFreeUsed) ? 0 : SkuCosts.palmPremium;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context).t('palm.title')),
+        actions: const [],
+      ),
+      body: Stack(children: [
+        // Subtle background
+        CustomPaint(painter: _PalmStarsPainter(goldAlpha: _goldAlpha, starCount: _starCount), size: Size.infinite),
+
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const SizedBox(height: 8),
+            Expanded(
+              child: GestureDetector(
+                onTap: _chooseAndPick,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: gold.withValues(alpha: (_goldAlpha.clamp(0, 1)).toDouble()), width: _goldStroke),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: image == null
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.pan_tool_outlined, size: 80, color: Colors.white70),
+                                const SizedBox(height: 10),
+                                Text(AppLocalizations.of(context).t('palm.add_photo_hint'), style: const TextStyle(color: Colors.white54)),
+                              ],
+                            ),
+                          )
+                        : ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: SizedBox.expand(
+                              child: FittedBox(
+                                fit: BoxFit.cover,
+                                alignment: Alignment.center,
+                                child: Image.file(image!),
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+            // Üslup seçimi
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: Text(AppLocalizations.of(context).t('palm.style.practical') != 'palm.style.practical'
+                        ? AppLocalizations.of(context).t('palm.style.practical')
+                        : 'Pratik'),
+                    selected: _style == 'practical',
+                    onSelected: (_) => setState(() => _style = 'practical'),
+                  ),
+                  ChoiceChip(
+                    label: Text(AppLocalizations.of(context).t('palm.style.spiritual') != 'palm.style.spiritual'
+                        ? AppLocalizations.of(context).t('palm.style.spiritual')
+                        : 'Spiritüel'),
+                    selected: _style == 'spiritual',
+                    onSelected: (_) => setState(() => _style = 'spiritual'),
+                  ),
+                  ChoiceChip(
+                    label: Text(AppLocalizations.of(context).t('palm.style.analytical') != 'palm.style.analytical'
+                        ? AppLocalizations.of(context).t('palm.style.analytical')
+                        : 'Analitik'),
+                    selected: _style == 'analytical',
+                    onSelected: (_) => setState(() => _style = 'analytical'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide.none,
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  icon: const Icon(Icons.image, size: 18),
+                  label: Text(AppLocalizations.of(context).t('action.from_gallery')),
+                  onPressed: () => _pick(ImageSource.gallery),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide.none,
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  icon: const Icon(Icons.photo_camera, size: 18),
+                  label: Text(AppLocalizations.of(context).t('action.from_camera')),
+                  onPressed: () => _pick(ImageSource.camera),
+                ),
+              ),
+            ]),
+
+            const SizedBox(height: 10),
+            SafeArea(
+              top: false,
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: gold,
+                    foregroundColor: Colors.black,
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: image == null
+                      ? null
+                      : () async {
+                          await Analytics.log('reading_started', {'type': 'palm'});
+                          // Prevent starting a new reading if there is a pending one
+                          final nextAt = await PendingReadingsService.nextReadyAtForType('palm');
+                          if (nextAt != null && nextAt.isAfter(DateTime.now())) {
+                            if (!mounted) return;
+                            final left = nextAt.difference(DateTime.now()).inMinutes + 1;
+                            final msg = '${AppLocalizations.of(context).t('palm.title')} - bekleyen okuma var. Kalan: ~${left} dk';
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                            return;
+                          }
+                          final ok = await AccessGate.ensureAccessOrPaywall(
+                            context,
+                            sku: 'reading.palm_premium',
+                            coinCost: SkuCosts.palmPremium,
+                          );
+                          if (!ok) return;
+                          if (!mounted) return;
+                          setState(() => scanning = true);
+                        },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(AppLocalizations.of(context).t('palm.cta_start')),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.monetization_on_outlined, size: 16),
+                      const SizedBox(width: 2),
+                      Text('$displayCost'),
+                      if (displayCost == 0) ...[
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message: ent.isPremium
+                              ? (AppLocalizations.of(context).t('premium.free_reason') != 'premium.free_reason'
+                                  ? AppLocalizations.of(context).t('premium.free_reason')
+                                  : 'Premium: 0 coin')
+                              : (AppLocalizations.of(context).t('first_free.reason') != 'first_free.reason'
+                                  ? AppLocalizations.of(context).t('first_free.reason')
+                                  : 'İlk fal ücretsiz: 0 coin'),
+                          child: const Icon(Icons.info_outline, size: 16),
+                        ),
+                      ],
+                    ],
+                  )
+                ),
+              ),
+            ),
+          ]),
+        ),
+
+        if (scanning)
+          ScanningOverlay(
+            onDone: () {
+              if (!mounted) return;
+              setState(() => scanning = false);
+              final readyAt = DateTime.now().add(const Duration(minutes: 10));
+              // Schedule a reminder notification only (avoid duplicate history generation)
+              try {
+                PendingReadingsService.schedule(
+                  type: 'palm',
+                  readyAt: readyAt,
+                  extras: {'notifyOnly': true},
+                  locale: Localizations.localeOf(context).languageCode,
+                );
+              } catch (_) {}
+              context.push('/reading/result/palm', extra: {
+                'imagePath': image!.path,
+                'sessionId': DateTime.now().millisecondsSinceEpoch,
+                'etaSeconds': const Duration(minutes: 10).inSeconds,
+                'readyAt': readyAt.toIso8601String(),
+                'generateAtReady': true,
+                'style': _style,
+                'noStream': true,
+                'forceLocal': true,
+              });
+            },
+          ),
+      ]),
+    );
+  }
+}
+
+class _PalmStarsPainter extends CustomPainter {
+  final double goldAlpha;
+  final int starCount;
+  const _PalmStarsPainter({required this.goldAlpha, required this.starCount});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bg = Paint()
+      ..shader = const RadialGradient(colors: [Color(0x332A1B4A), Colors.transparent], radius: 0.6)
+          .createShader(Rect.fromCircle(center: const Offset(80, 60), radius: 160));
+    canvas.drawRect(Offset.zero & size, bg);
+
+    final violet = Paint()..color = const Color(0xFF9B79F7).withValues(alpha: 0.18);
+    final gold = Paint()..color = const Color(0xFFFFC857).withValues(alpha: (goldAlpha * 0.6).clamp(0.08, 0.6));
+    for (int i = 0; i < starCount; i++) {
+      final dx = (i * 71 % size.width).toDouble();
+      final dy = (i * 119 % size.height).toDouble();
+      final r = (i % 7 == 0) ? 1.9 : 1.2;
+      canvas.drawCircle(Offset(dx, dy), r, i.isEven ? violet : gold);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PalmStarsPainter old) => old.goldAlpha != goldAlpha || old.starCount != starCount;
+}

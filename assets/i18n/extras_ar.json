@@ -1,0 +1,46 @@
+{
+  "coins.confirm.title": "سيتم خصم عملات",
+  "coins.confirm.body": "ستستهلك هذه القراءة عملات. تحقق من الرصيد.",
+  "coins.confirm.spend": "ادفع",
+
+  "tarot.fast.offer.title": "هل تريدها أسرع؟",
+  "tarot.fast.offer.body": "شاهد إعلانًا لتقليل الانتظار من 10 إلى 5 دقائق.",
+  "tarot.fast.watch_ad": "شاهد إعلان (5 د)",
+  "tarot.fast.normal": "عادي (10 د)",
+  "tarot.fast.thanks": "شكرًا! ستكون القراءة جاهزة خلال 5 دقائق.",
+  "tarot.fast.ad_failed": "تعذر عرض الإعلان. المتابعة بالسرعة العادية (10 د).",
+
+  "palm.cta_start": "ابدأ التحليل",
+  "dream.cta": "فسّر",
+  "deep.tarot.p1": "1) تركيز: دوِّن رسالة البطاقة في جملة واحدة.",
+  "deep.tarot.p2": "2) تواصل: اختر اليوم كلمة لطيفة وواضحة.",
+  "deep.tarot.p3": "3) ختام: مراجعة مسائية من ثلاث جمل.",
+  "deep.coffee.p1": "اجمع بين حواف الفنجان وقاعدته؛ التكرارات تكشف العادات.",
+  "deep.palm.p1": "اقرأ خط القلب وخط الرأس كلٌ على حدة.",
+  "deep.dream.p1": "لاحظ رمزك 3 مرات اليوم؛ دوِّن ملاحظات سريعة.",
+  "deep.sep": "---",
+  "energy.generic.low": "بلطف: نفس واحد ونية واحدة.",
+  "energy.generic.med": "15–20 دقيقة تركيز مفيد.",
+  "energy.generic.high": "أضف خطوة جريئة وحدِّد هدفًا واضحًا.",
+  "daily.tip.1": "ابدأ بمهمة صغيرة ومحددة.",
+  "daily.tip.2": "جملة لطيفة وواضحة تُسهل التواصل.",
+  "daily.tip.3": "ثلاث أنفاس عميقة قبل القرار.",
+  "daily.tip.4": "أغلق عملاً مؤجلاً.",
+  "daily.tip.5": "اشرب ماءً وتمشَّ 5 دقائق.",
+  "daily.tip.6": "اكتب نية بجملة واحدة.",
+  "daily.tip.7": "احتفل بإنجاز صغير الليلة.",
+  "ai.scanning": "...تحليل بالذكاء الاصطناعي"
+  ,
+  "auth.signup.invite": "ليس لديك حساب؟ سجّل",
+  "premium.free_reason": "بريميوم: 0 عملة",
+  "first_free.reason": "أول قراءة مجانية: 0 عملة"
+  ,
+  "reading.countdown.done": "تم إرسال قراءتك إلى السجل.",
+  
+  "coffee.topic.title": "الموضوع",
+  "coffee.topic.love": "الحب",
+  "coffee.topic.work": "العمل",
+  "coffee.topic.money": "المال",
+  "coffee.topic.health": "الصحة",
+  "coffee.topic.general": "عام"
+}

@@ -1,0 +1,231 @@
+﻿import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/entitlements/entitlements_controller.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/i18n/app_localizations.dart';
+import '../notifications/notification_center_page.dart';
+import '../help/faq_page.dart';
+import '../legal/legal_pages.dart';
+import '../../core/rewards/rewards_controller.dart';
+import '../../features/history/history_controller.dart';
+import '../../core/i18n/locale_controller.dart';
+import 'profile_controller.dart';
+import 'edit_profile_page.dart';
+import 'user_profile.dart';
+import '../help/feedback_page.dart';
+
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final ent = context.watch<EntitlementsController>();
+    final loc = AppLocalizations.of(context);
+    final rewards = context.watch<RewardsController>();
+    final hist = context.watch<HistoryController>();
+    final profileCtrl = context.watch<ProfileController>();
+    final lc = context.watch<LocaleController>();
+    final code = lc.locale?.languageCode;
+    String langLabel(String? c) {
+      switch (c) {
+        case 'tr':
+          reTürkçe';
+        case 'en':
+          return 'English';
+        case 'es':
+          return 'Español';
+        case 'العربية
+          return 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©';
+        default:
+          return 'Sistem Dili';
+      }
+    }
+    final p = profileCtrl.profile;
+    return Scaffold(
+      appBar: AppBar(title: Text(loc.t('profile.title'))),
+      body: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+            const CircleAvatar(radius: 34, child: Icon(Icons.person, size: 34)),
+            const SizedBox(height: 12),
+            Text(p.name.isEmpty ? 'Ä°simsiz' : p.name,
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Row(children: [
+              const Icon(Icons.cake, size: 18), const SizedBox(width: 6),
+              Text(p.birthDate != null
+                  ? '${p.birthDate!.day}.${p.birthDate!.month}.${p.birthDate!.year}'
+                  : 'â€”'),
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              const Icon(Icons.star_border, size: 18), const SizedBox(width: 6),
+              Text(p.zodiac.isEmpty ? 'â€”' : p.zodiac),
+            ]),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const EditProfilePage())),
+              child: const Text('Profili Düzenle'),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.bolt),
+                title: Text(loc.t('profile.energy')),
+                subtitle: LinearProgressIndicator(value: ent.energy / 100),
+                trailing: Text('${ent.energy}%'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Element Dengesi'),
+                    const SizedBox(height: 8),
+                    _ElementRow(zodiac: p.zodiac),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.monetization_on_outlined),
+                title: Text(loc.t('profile.wallet')),
+                trailing: Text('${ent.coins}'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () => context.push('/paywall'),
+              child: Text(loc.t('profile.premium')),
+            ),
+            const SizedBox(height: 8),
+            Text(ent.isPremium
+                ? 'Premium: ${ent.premiumSku == 'lifetime.mystic_plus' ? 'Lifetime' : 'BitiÅŸ: ${ent.premiumUntil}'}'
+                : 'Premium aktif deÄŸil'),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => context.push('/settings'),
+              child: Text(loc.t('settings.title')),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: rewards.canClaimDaily()
+                  ? () async {
+                      final ok = await rewards.claimDaily(ent);
+                      if (ok && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('GÃ¼nlÃ¼k 10 coin kazandÄ±nÄ±z!')));
+                      }
+                    }
+                  : null,
+              child: const Text('GÃ¼nlÃ¼k Ã–dÃ¼lÃ¼ Al (+10 coin)'),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: rewards.canClaimWeekly(hist)
+                  ? () async {
+                      final ok = await rewards.claimWeekly(ent, hist);
+                      if (ok && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('1 Ã¼cretsiz fal kazandÄ±nÄ±z!')));
+                      }
+                    }
+                  : null,
+              child: const Text('Haftalık Görev: 3 fal • 1 bedava'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationCenterPage()),
+              ),
+              child: const Text('Bildirimler'),
+            ),
+            const SizedBox(height: 8),
+            // Dil seÃ§imi (Ayarlar)
+            Card(
+              color: const Color(0xFF151019),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.white12)),
+              child: ListTile(
+                leading: const Icon(Icons.language),
+                title: const Text('Dil'),
+                subtitle: Text(langLabel(code)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const FaqPage()),
+              ),
+              child: const Text('Yardım & SSS'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const FeedbackPage()),
+              ),
+              child: const Text('Geri Bildirim Gönder'),
+            ),
+            const SizedBox(height: 8),
+            Row(children: [
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TermsPage()),
+                ),
+                child: const Text('KoÅŸullar'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PrivacyPage()),
+                ),
+                child: const Text('Gizlilik'),
+              ),
+            ])
+        ],
+      ),
+    );
+  }
+}
+
+class _ElementRow extends StatelessWidget {
+  final String zodiac;
+  const _ElementRow({required this.zodiac});
+  @override
+  Widget build(BuildContext context) {
+    final el = ZodiacUtil.element(zodiac);
+    final values = {
+      'AteÅŸ': 0.8,
+      'Toprak': 0.6,
+      'Hava': 0.4,
+      'Su': 0.5,
+    };
+    // boost the zodiac's element
+    if (values.containsKey(el)) {
+      values[el] = (values[el]! + 0.1).clamp(0.0, 1.0);
+    }
+    return Column(
+      children: values.entries
+          .map((e) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  children: [
+                    SizedBox(width: 70, child: Text(e.key)),
+                    Expanded(
+                      child: LinearProgressIndicator(value: e.value),
+                    )
+                  ],
+                ),
+              ))
+          .toList(),
+    );
+  }
+}
+

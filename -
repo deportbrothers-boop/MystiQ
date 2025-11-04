@@ -1,0 +1,24 @@
+{
+  "subscriptions": [
+    {"sku": "sub.premium.weekly", "label": "Haftalık Premium", "price": "₺49,99", "desc": "Haftalık reklamsız + sınırsız fal"},
+    {"sku": "sub.premium.monthly", "label": "Aylık Premium", "price": "₺129,99", "desc": "Reklamsız deneyim, sınırsız fal ve özel kart setleri"},
+    {"sku": "sub.premium.quarterly", "label": "3 Aylık Premium", "price": "₺349,99", "desc": "%10 indirimli paket"},
+    {"sku": "sub.premium.yearly", "label": "Yıllık Premium", "price": "₺999,99", "desc": "%35 indirim + özel avatar + müzik"},
+    {"sku": "lifetime.mystic_plus", "label": "Mystic+ (Lifetime)", "price": "₺1.999,99", "desc": "Ömür boyu tüm içerik + AR & AI"}
+  ],
+  "onetime": [
+    {"sku": "reading.coffee_fast", "label": "Hızlı Kahve Falı", "price": "₺39,99", "desc": "Kısa yorum + enerji"},
+    {"sku": "reading.tarot_deep", "label": "Derin Tarot Açılımı", "price": "₺79,99", "desc": "7 kart geçmiş-gelecek analizi"},
+    {"sku": "reading.love_match", "label": "Aşk Uyumu Falı", "price": "₺89,99", "desc": "Partner analizi + uyum"},
+    {"sku": "reading.palm_premium", "label": "El Falı Premium", "price": "₺119,99", "desc": "Çizgi okuma + kader"},
+    {"sku": "report.annual_2025", "label": "Kader Haritası 2025", "price": "₺199,99", "desc": "Yıllık astrolojik rapor (PDF)"},
+    {"sku": "reading.combo_karma", "label": "Karma Falı (Tüm Set)", "price": "₺249,99", "desc": "Kahve + Tarot + Enerji"}
+  ],
+  "coins": [
+    {"sku": "coin.100", "label": "Mini 100 Coin", "price": "₺29,99"},
+    {"sku": "coin.500", "label": "Standart 500 (+50)", "price": "₺99,99"},
+    {"sku": "coin.1200", "label": "Büyük 1200 (+200)", "price": "₺199,99"},
+    {"sku": "coin.3000", "label": "Mega 3000 (+600)", "price": "₺399,99"},
+    {"sku": "coin.7000", "label": "Mystic 7000 (+1000)", "price": "₺699,99"}
+  ]
+}

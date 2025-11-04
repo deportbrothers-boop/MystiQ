@@ -1,0 +1,371 @@
+﻿import '../../core/i18n/app_localizations.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'history_controller.dart';
+import 'history_entry.dart';
+import '../../core/readings/pending_readings_service.dart';
+import '../../core/ads/rewarded_helper.dart';
+import '../../core/analytics/analytics.dart';
+
+class HistoryPage extends StatefulWidget {
+  const HistoryPage({super.key});
+  @override
+  State<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+  String _filter = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<HistoryController>().load();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hc = context.watch<HistoryController>();
+    final items = hc.items.where((e) => _filter == 'all' ? true : e.type == _filter).toList();
+    return Scaffold(
+      appBar: AppBar(title: Text(AppLocalizations.of(context).t('nav.history'))),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                _chip('all', AppLocalizations.of(context).t('common.all')),
+                _chip('tarot', AppLocalizations.of(context).t('tarot.title')),
+                _chip('coffee', AppLocalizations.of(context).t('coffee.title')),
+                _chip('palm', AppLocalizations.of(context).t('palm.title')),
+                _chip('dream', AppLocalizations.of(context).t('dream.title')),
+                _chip('astro', AppLocalizations.of(context).t('astro.title')),
+              ],
+            ),
+          ),
+          Expanded(
+            child: items.isEmpty
+                ? const _EmptyState()
+                : RefreshIndicator(
+                    onRefresh: () => hc.load(),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) => _HistoryCard(entry: items[i]),
+                    ),
+                  ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String key, String label) {
+    final sel = _filter == key;
+    return ChoiceChip(
+      label: Text(label),
+      selected: sel,
+      onSelected: (_) => setState(() => _filter = key),
+      selectedColor: const Color(0xFF2A2238),
+    );
+  }
+}
+
+class _HistoryCard extends StatelessWidget {
+  final HistoryEntry entry;
+  const _HistoryCard({required this.entry});
+  @override
+  Widget build(BuildContext context) {
+    final hc = context.read<HistoryController>();
+    final date = DateFormat('dd.MM.yyyy – HH:mm').format(entry.createdAt);
+    final icon = _icon(entry.type);
+    final color = _color(entry.type);
+    return Dismissible(
+      key: ValueKey(entry.id),
+      background: Container(color: Colors.redAccent),
+      onDismissed: (_) => hc.delete(entry.id),
+      child: InkWell(
+        onTap: () async {
+          if (entry.type == 'coffee') {
+            try {
+              final item = await PendingReadingsService.firstPendingOfType('coffee');
+              final raStr = (item?['readyAt'] as String?) ?? '';
+              final readyAt = DateTime.tryParse(raStr);
+              if (readyAt != null && readyAt.isAfter(DateTime.now())) {
+                final choice = await showModalBottomSheet<String>(
+                  context: context,
+                  showDragHandle: true,
+                  backgroundColor: const Color(0xFF121018),
+                  builder: (_) => SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(AppLocalizations.of(context).t('coffee.fast.offer.title') != 'coffee.fast.offer.title'
+                              ? AppLocalizations.of(context).t('coffee.fast.offer.title')
+                              : 'Daha hızlı sonuç ister misiniz?',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(AppLocalizations.of(context).t('coffee.fast.offer.desc') != 'coffee.fast.offer.desc'
+                              ? AppLocalizations.of(context).t('coffee.fast.offer.desc')
+                              : 'Reklam izlerseniz kahve falınız 10 dk yerine 5 dk içinde hazır olur.'),
+                          const SizedBox(height: 14),
+                          Row(children: [
+                            Expanded(child: ElevatedButton.icon(icon: const Icon(Icons.rocket_launch, size: 18), onPressed: () => Navigator.pop(context, 'ad'), label: Text(AppLocalizations.of(context).t('coffee.fast.watch_ad') != 'coffee.fast.watch_ad' ? AppLocalizations.of(context).t('coffee.fast.watch_ad') : 'Reklam izle (5 dk)'))),
+                            const SizedBox(width: 10),
+                            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, 'normal'), child: Text(AppLocalizations.of(context).t('coffee.fast.normal') != 'coffee.fast.normal' ? AppLocalizations.of(context).t('coffee.fast.normal') : 'Normal (10 dk)'))),
+                          ])
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+                var eta = readyAt.difference(DateTime.now());
+                if (choice == 'ad') {
+                  final ok = await RewardedAds.show(context: context);
+                  if (ok) {
+                    eta = const Duration(minutes: 5);
+                    try {
+                      final newReady = DateTime.now().add(eta);
+                      final id = item?['id'] as String?;
+                      if (id != null) {
+                        await PendingReadingsService.updateReadyAt(id: id, type: 'tarot', readyAt: newReady, locale: Localizations.localeOf(context).languageCode);
+                      }
+                    } catch (_) {}
+                    try { await RewardedAds.recordOne(); } catch (_) {}
+                    try { await Analytics.log('history_speedup_choice', {'type': 'coffee', 'choice': 'ad', 'ok': true}); } catch (_) {}
+                  }
+                } else {
+                  try { await Analytics.log('history_speedup_choice', {'type': 'coffee', 'choice': 'normal'}); } catch (_) {}
+                }
+                if (!context.mounted) return;
+                context.push('/reading/result/coffee', extra: {
+                  'etaSeconds': eta.inSeconds.clamp(0, 86400),
+                  'readyAt': DateTime.now().add(eta).toIso8601String(),
+                  'generateAtReady': true,
+                  'noStream': true,
+                  'forceLocal': true,
+                  if ((item?['id'] as String?) != null) 'pendingId': item?['id'],
+                });
+                return;
+              }
+            } catch (_) {}
+          } else if (entry.type == 'tarot') {
+            try {
+              final item = await PendingReadingsService.firstPendingOfType('tarot');
+              final raStr = (item?['readyAt'] as String?) ?? '';
+              final readyAt = DateTime.tryParse(raStr);
+              if (readyAt != null && readyAt.isAfter(DateTime.now())) {
+                final choice = await showModalBottomSheet<String>(
+                  context: context,
+                  showDragHandle: true,
+                  backgroundColor: const Color(0xFF121018),
+                  builder: (_) => SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(AppLocalizations.of(context).t('tarot.fast.offer.title') != 'tarot.fast.offer.title'
+                              ? AppLocalizations.of(context).t('tarot.fast.offer.title')
+                              : 'Daha hizli olsun mu?',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(AppLocalizations.of(context).t('tarot.fast.offer.body') != 'tarot.fast.offer.body'
+                              ? AppLocalizations.of(context).t('tarot.fast.offer.body')
+                              : 'Reklam izlerseniz 10 dk yerine 5 dk olur.'),
+                          const SizedBox(height: 14),
+                          Row(children: [
+                            Expanded(child: ElevatedButton.icon(icon: const Icon(Icons.rocket_launch, size: 18), onPressed: () => Navigator.pop(context, 'ad'), label: Text(AppLocalizations.of(context).t('tarot.fast.watch_ad') != 'tarot.fast.watch_ad' ? AppLocalizations.of(context).t('tarot.fast.watch_ad') : 'Reklam izle (5 dk)'))),
+                            const SizedBox(width: 10),
+                            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, 'normal'), child: Text(AppLocalizations.of(context).t('tarot.fast.normal') != 'tarot.fast.normal' ? AppLocalizations.of(context).t('tarot.fast.normal') : 'Normal (10 dk)'))),
+                          ])
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+                var eta = readyAt.difference(DateTime.now());
+                if (choice == 'ad') {
+                  final ok = await RewardedAds.show(context: context);
+                  if (ok) {
+                    eta = const Duration(minutes: 5);
+                    // Persist new readyAt to pending store so re-entry shows correct time
+                    try {
+                      final newReady = DateTime.now().add(eta);
+                      final id = item?['id'] as String?;
+                      if (id != null) {
+                        await PendingReadingsService.updateReadyAt(id: id, type: 'coffee', readyAt: newReady, locale: Localizations.localeOf(context).languageCode);
+                      }
+                    } catch (_) {}
+                    try { await RewardedAds.recordOne(); } catch (_) {}
+                    try { await Analytics.log('history_speedup_choice', {'type': 'tarot', 'choice': 'ad', 'ok': true}); } catch (_) {}
+                  }
+                } else {
+                  try { await Analytics.log('history_speedup_choice', {'type': 'tarot', 'choice': 'normal'}); } catch (_) {}
+                }
+                final extras = (item?['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+                if (!context.mounted) return;
+                context.push('/reading/result/tarot', extra: {
+                  if ((extras['cards'] is List)) 'cards': (extras['cards'] as List),
+                  if ((extras['cardIndices'] is List)) 'cardIndices': (extras['cardIndices'] as List),
+                  if ((extras['reversed'] is List)) 'reversed': (extras['reversed'] as List),
+                  'etaSeconds': eta.inSeconds.clamp(0, 86400),
+                  'readyAt': DateTime.now().add(eta).toIso8601String(),
+                  'generateAtReady': true,
+                  'noStream': true,
+                  'forceLocal': true,
+                  if ((item?['id'] as String?) != null) 'pendingId': item?['id'],
+                });
+                return;
+              }
+            } catch (_) {}
+          }
+          context.push('/reading/result/${entry.type}', extra: entry);
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1D1726), Color(0xFF0F0D15)],
+            ),
+            border: Border.all(color: Colors.white12),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withValues(alpha: 0.4)),
+                ),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: color.withValues(alpha: 0.4)),
+                          ),
+                          child: Text(entry.type.toUpperCase(), style: TextStyle(color: color, fontSize: 11)),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(date, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(entry.favorite ? Icons.star : Icons.star_border, color: entry.favorite ? Colors.amber : Colors.white60),
+                          onPressed: () => hc.toggleFavorite(entry.id),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(entry.title, style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      _clip(entry.text),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _clip(String t) {
+    final s = t.replaceAll('\\n', ' ').trim();
+    return s.length > 140 ? s.substring(0, 140) + '...' : s;
+  }
+
+  IconData _icon(String t) {
+    switch (t) {
+      case 'coffee':
+        return Icons.coffee;
+      case 'tarot':
+        return Icons.style;
+      case 'palm':
+        return Icons.pan_tool_alt_outlined;
+      case 'dream':
+        return Icons.nightlight_round;
+      case 'astro':
+        return Icons.brightness_2_outlined;
+      default:
+        return Icons.auto_awesome;
+    }
+  }
+
+  Color _color(String t) {
+    switch (t) {
+      case 'coffee':
+        return const Color(0xFFC69C6D);
+      case 'tarot':
+        return const Color(0xFF9B79F7);
+      case 'palm':
+        return const Color(0xFF66C3A1);
+      case 'dream':
+        return const Color(0xFF7DA6FF);
+      case 'astro':
+        return const Color(0xFFFFC857);
+      default:
+        return Colors.amber;
+    }
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.auto_awesome, size: 48, color: Colors.white38),
+          const SizedBox(height: 8),
+          Text(AppLocalizations.of(context).t('history.empty'), style: const TextStyle(color: Colors.white70)),
+        ],
+      ),
+    );
+  }
+}
+
+
+
+
+
+
+
+
+
+
+

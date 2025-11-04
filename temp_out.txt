@@ -1,0 +1,275 @@
+import 'dart:math';
+import '../../features/profile/user_profile.dart';
+
+/// Local Turkish fallback generator used when remote AI is unavailable.
+/// Produces clean UTF-8 Turkish texts for all reading types.
+class LocalAIGenerator {
+  static String generate({
+    required String type, // coffee|tarot|palm|astro|dream|live_chat
+    required UserProfile profile,
+    int? seed,
+    Map<String, dynamic>? extras,
+    String locale = 'tr',
+  }) {
+    final rnd = Random(seed ?? DateTime.now().millisecondsSinceEpoch);
+    final name = profile.name.isEmpty ? 'Sevgili ruh' : profile.name;
+    final zodiac = profile.zodiac.isEmpty ? 'burcun' : profile.zodiac;
+
+    if (type == 'coffee') {
+      final mood = _pick(rnd, ['sakin', 'umutlu', 'içten', 'aydınlık']);
+      final arc = _pick(rnd, ['yenilenme', 'netleşme', 'cesaret', 'denge']);
+      return (
+        '$name, fincandaki telve desenleri $mood bir tonda; hayatında $arc temasını öne çıkarıyor.\n\n'
+        'Genel Çerçeve:\n'
+        'Spiral ve kıvrımlar, düşüncelerin yavaş yavaş bir merkezde toplanmasına işaret. '
+        'Son günlerde beliren küçük işaretler (zamanlamalar, tekrar eden kelimeler) dikkati başlıca konuya çekiyor.\n\n'
+        'Birinci Fincan:\n'
+        'Kenar çizgilerine yakın küçük yıldız benzeri noktalar, çevrenden gelen destekleri anlatır. '
+        'Kalbini yoran alanlarda küçük ama net sınırlar koyduğunda, iç huzurun hızla güçlenecek.\n\n'
+        'İkinci Fincan:\n'
+        'Merkeze yakın dalga izleri, bir kararın olgunlaştığını gösteriyor. '
+        'Kendine bir hafta ver; her gün 10 dakikalık odakla bu kararın en pratik ilk adımını yaz.\n\n'
+        'Tabak Öyküsü:\n'
+        'Tabakta kalan ince çizgiler, “eşiği açma” temasını çağrıştırıyor. '
+        'Eski bir alışkanlığı nazikçe bırakmak, yeni olana alan açacak.\n\n'
+        'Öneriler:\n'
+        '• Bugün 3 cümle niyet yaz.\n'
+        '• Akşam 5 dakika nefes ve esneme.\n\n'
+        'Not: Bu okuma eğlence amaçlıdır; kararlarında kendi sezgini ve gerekirse uzman görüşünü öncele.'
+      );
+    }
+
+    if (type == 'tarot') {
+      final names = (extras?['cards'] is List)
+          ? (extras!['cards'] as List).map((e) => e.toString()).toList()
+          : <String>[];
+      final past = names.isNotEmpty ? names[0] : _pick(rnd, ['Geçmiş kartı', 'Bir önceki adım']);
+      final present = names.length > 1 ? names[1] : _pick(rnd, ['Şimdi kartı', 'Odak noktan']);
+      final future = names.length > 2 ? names[2] : _pick(rnd, ['Gelecek kartı', 'Ufuk kartı']);
+      final theme = _pick(rnd, ['sabır', 'cesaret', 'içsel dürüstlük', 'yaratıcılık']);
+      return (
+        '$name, seçtiğin üç kartın dili yumuşak ama belirgin.\n\n'
+        'Geçmiş ($past): $theme ile sınanmış dönemler, öğrenilen dersleri parlatıyor. '
+        'Geride bıraktıkların artık yük değil; deneyim. Kendini yargılamak yerine şefkatle kabullenmek, '
+        'bir sonraki hamleyi aydınlatıyor.\n\n'
+        'Şimdi ($present): Kalbini sakinleştiren küçük bir ritüel (nefes, mum, niyet) sezgini keskinleştirir. '
+        'Gün içinde üç derin nefes + kısa bir yürüyüş, zihni berraklaştırır ve konuşmalarına denge taşır. '
+        'Güvendiğin iki küçük adımı bugün planlayabilirsin.\n\n'
+        'Gelecek ($future): Ufak ama anlamlı bir adım, beklenen kapıyı aralayabilir. '
+        'Sabırlı ama kararlı ilerleyiş, yoluna eşlik eden kapıları birer birer açacak. '
+        'Kendine nazik ol; evren, net niyetinle hizalanıyor.\n\n'
+        'Kapanış: İç sesinin rehberliğine güven. Bir bardak suyla niyetini tazele, '
+        'akşam kısa bir şükran cümlesiyle günü tamamla. Işığın yolunla olsun.'
+      );
+    }
+
+    if (type == 'palm') {
+      final tone = _pick(rnd, ['sakin', 'şefkatli', 'ilham verici', 'gerçekçi']);
+      final heart = _pick(rnd, ['derin bağ kurma ihtiyacı', 'sınır koyma becerisi', 'duygularını ifade etme cesareti']);
+      final head = _pick(rnd, ['yaratıcı düşünme', 'analitik bakış', 'pratik zeka']);
+      final life = _pick(rnd, ['istikrarlı güç', 'dalgasal enerji', 'yüksek toparlanma gücü']);
+      final fate = _pick(rnd, ['kariyer düşünmeleri', 'kendi yolunu çizme', 'sorumluluk artışı']);
+      return (
+        '$name, avucundaki çizgiler $tone bir anlatı sunuyor.\n\n'
+        'Kalp Çizgisi: $heart öne çıkıyor. Küçük ama net sınırlar, ilişkilerinde huzuru büyütür.\n'
+        'Baş Çizgisi: $head seni destekliyor. Günde 10 dakikalık odak yürüyüşü, zihni berraklaştırır.\n'
+        'Yaşam Çizgisi: $life. Dinlenme–hareket dengesi, enerji kaliteni artırır.\n'
+        'Kader Çizgisi: $fate. Ufak adımların toplamı, kapıların açılışını hızlandırır.\n\n'
+        'Öneriler:\n'
+        '• Haftalık mini ritüel: mum, müzik, niyet.\n'
+        '• Bir cümle şükran, bir bardak su.\n\n'
+        'Not: Bu okuma eğlence amaçlıdır; kararlarında sezgini ve gerekirse uzman görüşünü öncele.'
+      );
+    }
+
+    if (type == 'dream') {
+      final input = (extras?['text'] ?? '').toString().replaceAll('\n', ' ').trim();
+      final preview = input.isEmpty ? '—' : (input.length > 160 ? input.substring(0, 160) + '…' : input);
+      const stopWords = {
+        've','ile','ama','fakat','lakin','çünkü','ancak','ya','de','da','ki','için','gibi','çok','bir','biraz',
+        'beni','bana','ben','sen','o','biz','siz','onlar','mı','mi','mu','mü','gün','gece','rüya','rüyam','rüyada',
+        'rüyamda','gördüm','gördüğüm','vardı','yoktu','hala','hep','daha'
+      };
+      List<String> tokenize(String s) => s
+          .toLowerCase()
+          .split(RegExp(r'[^a-zA-Zçğıöşü0-9]+'))
+          .where((w) => w.length >= 3 && !stopWords.contains(w) && !RegExp(r'^\d+$').hasMatch(w))
+          .toList();
+      String stem(String w) {
+        var x = w.toLowerCase();
+        const suffixes = [
+          'ları','leri','larda','lerde','lardan','lerden','lara','lere',
+          'lar','ler','ımız','imiz','umuz','ümüz','mız','miz','muz','müz',
+          'ım','im','um','üm','m','sınız','siniz','sunuz','sünüz','sın','sin','sun','sün',
+          'dır','dir','dur','dür','tır','tir','tur','tür','dan','den','tan','ten',
+          'lik','lık','luk','lük','ci','cı','cu','cü','çi','çı','çu','çü'
+        ];
+        for (final s in suffixes) {
+          if (x.endsWith(s) && x.length - s.length >= 3) { x = x.substring(0, x.length - s.length); break; }
+        }
+        const synsets = {
+          'araba': ['otomobil','oto','taşıt','araç','arac'],
+          'ev': ['hane','konut','yuva'],
+          'yol': ['rota','seyahat','yolculuk','gezi'],
+          'su': ['deniz','nehir','okyanus','göl','sular'],
+          'kedi': ['pisi','pisicik','ked'],
+          'köpek': ['it','dog','kopek'],
+          'yılan': ['yilan','ejder'],
+          'uçak': ['ucak','uçuş','ucus'],
+          'para': ['nakit','kasa','kumbara'],
+          'aşk': ['sevgi','ask','ilişki','iliski','partner'],
+          'iş': ['çalışma','calisma','kariyer','meslek','işyeri','isyeri'],
+          'okul': ['ders','sınıf','sinif','öğretmen','ogretmen'],
+          'ölüm': ['olum','vefat','kayıp','kayip','yitim'],
+          'korku': ['endişe','kaygı','kabus'],
+          'diş': ['dis','dişler','disler'],
+          'bebek': ['çocuk','cocuk','yavru'],
+        };
+        for (final e in synsets.entries) {
+          if (e.value.contains(x)) return e.key;
+        }
+        return x;
+      }
+      final tokens = tokenize(input).map(stem).toList();
+      final counts = <String,int>{};
+      for (final t in tokens) { counts[t] = (counts[t] ?? 0) + 1; }
+      final sorted = counts.keys.toList()
+        ..sort((a,b){ final c = (counts[b]!-counts[a]!); return c!=0?c: b.length.compareTo(a.length); });
+      final keys = sorted.take(6).toList();
+      final sym = keys.isNotEmpty ? keys.join(', ') : _pick(rnd, ['su', 'yol', 'merdiven', 'kapı', 'gölge']);
+      final tone = _pick(rnd, ['dingin', 'yoğun', 'umutlu', 'düşünceli']);
+      return (
+        '$name, rüyanda öne çıkanlar: $preview\n\n'
+        'Semboller (anahtarlar): $sym\n'
+        'Bu bütün $tone bir enerji taşıyor ve mesajını duyguda netleştiriyor.\n\n'
+        'Duygusal Ton:\n'
+        'Rüya, iç dünyanda duygu–zihin dengesini çağırıyor. Küçük bir es verme, kendine şefkat alanı açar.\n\n'
+        'Günlük Yansıma:\n'
+        'Bugün efor açanlar ve kolay olanlar için kısa notlar al. Küçük bir düzenleme, zihinsel alanı ferahlatır.\n\n'
+        'Öneriler:\n'
+        '• Uyanır uyanmaz 3 cümle rüya özeti.\n'
+        '• Gün içinde 2 dakika nefes + omuz gevşetme.\n\n'
+        'Not: Bu yorum eğlence amaçlıdır; kararlarında sezgini ve gerekirse uzman görüşünü öncele.'
+      );
+    }
+
+    // Astro (daily) rich fallback — long, zodiac-aware
+    if (type == 'astro') {
+      String z = zodiac;
+      String element = _inferElement(z);
+      final tone = _pick(rnd, ['denge', 'akıcılık', 'cesaret', 'netleşme', 'huzur', 'odak']);
+      final headline = _pick(rnd, ['Genel Enerji', 'Günün Akışı', 'Bugünün Ritmi']);
+      final love = _pick(rnd, ['Aşk/İlişkiler', 'Kalp Alanı', 'Yakın İlişkiler']);
+      final work = _pick(rnd, ['Kariyer/Para', 'İş ve Üretkenlik', 'Maddi Akış']);
+      final health = _pick(rnd, ['Sağlık/Rutin', 'Ritim ve Beden', 'Günlük Rutin']);
+
+      String elemLine(String e) {
+        switch (e) {
+          case 'Ateş':
+            return 'Ateş elementi canlı; girişim cesareti ve görünürlük artıyor. Küçük riskler, net adımlarla birleştiğinde kapılar aralanır.';
+          case 'Toprak':
+            return 'Toprak elementi belirgin; somut ilerleme, düzen ve kalıcılık ön planda. Küçük ama istikrarlı adımlar en iyi sonucu getirir.';
+          case 'Hava':
+            return 'Hava elementi etkin; fikir alışverişi ve iletişim akıyor. Doğru kelimeler, doğru anda söylenince dengeler iyileşir.';
+          case 'Su':
+            return 'Su elementi derin; sezgi ve duygusal berraklık destekleniyor. Yavaşlamak ve hisleri yazmak iç dengeyi kuvvetlendirir.';
+          default:
+            return 'Bugün denge ve farkındalık temaları öne çıkıyor; küçük niyetler bile alan açıyor.';
+        }
+      }
+
+      final sb = StringBuffer()
+        ..writeln('$name, bugün $z için $tone çağrısı yüksek. $headline:')
+        ..writeln()
+        ..writeln(elemLine(element))
+        ..writeln('Gün içinde minik zaman pencereleri (10–15 dakika), önemli olana odaklanmana yardım eder. Bir konuyu seçip sade bir hedef yazman yeterli.')
+        ..writeln()
+        ..writeln('$love:')
+        ..writeln('Dinleme, bugün ilişkilerin ana anahtarı. Duygularını kısa ve net cümlelerle ifade et; “Şu anda şuna ihtiyacım var…” gibi ben-dili temiz bir köprü kurar. Geçmişten gelen bir düşünce döngüsü fark edersen, onu kısa bir nefes arasıyla nazikçe serbest bırak.')
+        ..writeln()
+        ..writeln('$work:')
+        ..writeln('Planlarını üç küçük adıma böl. İlk adım bugün, ikincisi haftanın ortası, üçüncüsü ise haftanın sonu için. Zaman blokları (25–30 dk) ve kısa esler, üretkenliği artırırken zihni berrak tutar. Bir dosya/posta/mesaj kapatmak, görünmez yükleri azaltır.')
+        ..writeln()
+        ..writeln('$health:')
+        ..writeln('Bedene nazikçe kulak ver. Omuz-boyun bölgesinde hafif esnetmeler, 5–7 dakika yürüyüş ve bir bardak su ile ritmini tazele. Erken akşam saatlerinde ekranı kısmen azaltmak, uyku kalitesini yükseltir ve sabah netliğini güçlendirir.')
+        ..writeln()
+        ..writeln('Ritüel/Öneriler:')
+        ..writeln('• Üç cümle niyet: Bugün odak — ' + tone + '.')
+        ..writeln('• 10–15 dk tek konu: Zihni dağıtan pencereleri kapat, tek hedefe odaklan.')
+        ..writeln('• Su + nefes: 4 sayıda al, 4 sayıda ver; iki tur yeter.')
+        ..writeln('• Akşam kısa kapanış: Günün bir cümle özeti ve bir cümle şükran.')
+        ..writeln()
+        ..write('Not: Bu yorum eğlence amaçlıdır; kendi sezgini ve gerekirse uzman görüşünü öncele.');
+
+      return sb.toString();
+    }
+    // Astro / daily generic fallback
+    final focus = _pick(rnd, ['iletişim', 'kariyer', 'yakın çevre', 'aile', 'kendini ifade']);
+    return '$name, bugün $zodiac enerjisi $focus alanında parlak.\n'
+        'Kısa bir meditasyon ve bir bardak su ile niyetini tazele.';
+  }
+
+  static T _pick<T>(Random r, List<T> list) => list[r.nextInt(list.length)];
+
+  static String _inferElement(String z) {
+    final t = z.toLowerCase();
+    const fire = ['koç', 'aslan', 'yay'];
+    const earth = ['boğa', 'başak', 'oğlak'];
+    const air = ['ikizler', 'terazi', 'kova'];
+    const water = ['yengeç', 'akrep', 'balık'];
+    if (fire.any(t.contains)) return 'Ateş';
+    if (earth.any(t.contains)) return 'Toprak';
+    if (air.any(t.contains)) return 'Hava';
+    if (water.any(t.contains)) return 'Su';
+    return '';
+  }
+}
+    if (type == 'live_chat') {
+      final tone = (extras?['tone'] ?? 'friendly').toString();
+      final length = (extras?['length'] ?? 'medium').toString();
+      final mood = _pick(rnd, ['sakin', 'samimi', 'neşeli', 'toparlayıcı']);
+      final vibe = _pick(rnd, ['iç sezgini dinlemek', 'net sınırlar koymak', 'küçük ama somut adımlar', 'şefkatle kendine yaklaşmak']);
+      String opener;
+      if (tone == 'spiritual') {
+        opener = '$name, niyetinle hizalandığında evren kapılar açar; şimdi kalbine iyi gelecek olan $vibe gibi görünüyor. Enerjin $mood; sezgi dalgan netleşiyor.';
+      } else if (tone == 'humorous') {
+        opener = '$name, kalbini rahatlatan bir kahve molası ve $vibe… Bazen evren de bildirimleri kapatıp bize gülümser 🙂';
+      } else {
+        opener = '$name, bir dost gibi söylemek isterim: şu anda kalbini rahatlatan şey $vibe olacak. Enerjin $mood bir tonda; doğru soruyu sorduğunda cevaplar ortaya çıkıyor.';
+      }
+
+      final tipA = _pick(rnd, [
+        'Şimdi 3 derin nefes al; nefes verirken “bırakıyorum” diye içinden tekrarla.',
+        'Konuyu tek bir cümleyle yaz: “Şu anda ihtiyacım olan…”. Bu cümleyi telefonuna not et.',
+        'Kısa bir yürüyüş veya 2 dakikalık esneme, zihni berraklaştırır.',
+      ]);
+      final tipB = _pick(rnd, [
+        'Bugün 10 dakikalık tek-odak zamanı ayır. Bildirimleri kapat, sadece bir adım at.',
+        'Güvendiğin birine küçük bir ricada bulun; destek istemek gücünü azaltmaz.',
+        'Uyumadan önce 2 cümle şükran yaz; minik bir ritüel, büyük fark yaratır.',
+      ]);
+
+      final follow = _pick(rnd, [
+        'İstersen, aklındaki asıl soruyu tek cümleyle paylaşır mısın?',
+        'Şu anda seni en çok zorlayan sahneyi bir cümleyle tarif etsen nasıl olur?',
+        'Bugün atabileceğin en küçük adım sence hangisi?',
+      ]);
+
+      final b = StringBuffer()
+        ..writeln(opener)
+        ..writeln();
+      if (length != 'short') {
+        b
+          ..writeln('Öneriler:')
+          ..writeln('• $tipA')
+          ..writeln('• $tipB')
+          ..writeln();
+      } else {
+        b
+          ..writeln('• $tipA')
+          ..writeln();
+      }
+      if (profile.zodiac.isNotEmpty) { final elem = _inferElement(profile.zodiac); if (elem.isNotEmpty) b.writeln('\nAstro notu: ' + elem + ' elementi bugün sezgini destekliyor.'); }\nb.writeln(follow);
+      return b.toString();
+    }
+

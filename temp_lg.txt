@@ -1,0 +1,590 @@
+﻿import 'dart:math';
+import '../../features/profile/user_profile.dart';
+
+// Clean, ASCII-safe local generator.
+// Uses i18n fallbacks from extras['i18n'] when provided.
+class LocalAIGenerator {
+  static String generate({
+    required String type, // coffee|tarot|palm|astro|dream|live_chat
+    required UserProfile profile,
+    int? seed,
+    Map<String, dynamic>? extras,
+    String locale = 'tr',
+  }) {
+    final rnd = Random(seed ?? DateTime.now().microsecondsSinceEpoch);
+    final lang = (locale == 'ar') ? 'en' : locale;\n    final dow = _weekdayName(locale: lang, weekday: DateTime.now().weekday);
+
+    final Map<String, dynamic> i18n = (extras?['i18n'] is Map)
+        ? Map<String, dynamic>.from(extras!['i18n'] as Map)
+        : <String, dynamic>{};
+    String i(String key, String fallback) {
+      final v = i18n[key];
+      return (v is String && v.trim().isNotEmpty) ? v : fallback;
+    }
+
+    final String name = profile.name.isEmpty
+        ? ({
+            'tr': i('ai.dear_soul', 'Sevgili ruh'),
+            'en': i('ai.dear_soul', 'Dear soul'),
+            'es': i('ai.dear_soul', 'Alma querida'),
+            'ar': i('ai.dear_soul', 'Dear soul'),
+          }[lang] ?? i('ai.dear_soul', 'Dear soul'))
+        : profile.name;
+
+    if (type == 'live_chat') {
+      final tone = (extras?['tone'] ?? 'friendly').toString();
+      final length = (extras?['length'] ?? 'medium').toString();
+      return _liveChat(lang, name, profile.zodiac, tone, length, dow, rnd, i18n);
+    }
+
+    final isPremium = (extras?['premium'] == true);
+
+    // Template-first fallback
+    final tplKey = 'ai.template.$type';
+    final tpl = i18n[tplKey];
+    String out;
+    if (tpl is String && tpl.trim().isNotEmpty) {
+      out = _fillTemplate(tpl, lang, name, dow, profile, extras);
+    } else {
+      switch (type) {
+        case 'coffee':
+          out = _coffee(lang, name, dow, rnd, extras, i18n);
+          break;
+        case 'tarot':
+          final cards = (extras?['cards'] as List?)?.map((e) => e.toString()).toList() ?? <String>[];
+          out = _tarot(lang, name, cards, dow, rnd);
+          break;
+        case 'palm':
+          out = _palm(lang, name, dow, rnd);
+          break;
+        case 'dream':
+          final text = (extras?['text'] ?? '').toString();
+          out = _dream(lang, name, text, dow, rnd);
+          break;
+        case 'astro':
+          out = _astro(lang, name, profile.zodiac, dow, rnd);
+          break;
+        default:
+          out = _generic(lang, name, dow, rnd);
+      }
+    }
+
+    if (type == 'dream') {
+      final style = (extras?['style'] ?? '').toString();
+      out = _applyDreamStyle(lang, out, style);
+    }
+    if (type == 'astro') {
+      final style = (extras?['style'] ?? '').toString();
+      out = _applyAstroStyle(lang, out, style);
+    }
+    if (type == 'coffee') {
+      final style = (extras?['style'] ?? '').toString();
+      out = _applyCoffeeStyle(lang, out, style);
+    }
+    if (type == 'tarot') {
+      final style = (extras?['style'] ?? '').toString();
+      out = _applyTarotStyle(lang, out, style);
+    }
+    if (type == 'palm') {
+      final style = (extras?['style'] ?? '').toString();
+      out = _applyPalmStyle(lang, out, style);
+    }
+    if (isPremium) {
+      out = _appendPremiumTyped(type, lang, out, i18n);
+    }
+    return out;
+  }
+
+  static String _fillTemplate(String tpl, String locale, String name, String dow, UserProfile profile, Map<String, dynamic>? extras) {
+    var out = tpl;
+    out = out.replaceAll('{name}', name);
+    out = out.replaceAll('{dow}', dow);
+    out = out.replaceAll('{zodiac}', profile.zodiac.isEmpty ? ({'tr': 'burcun', 'es': 'tu signo', 'ar': 'your sign', 'en': 'your sign'}[lang] ?? 'your sign') : profile.zodiac);
+    if (extras != null) {
+      if (extras['cards'] is List) {
+        final cards = (extras['cards'] as List).map((e) => '$e').toList();
+        out = out.replaceAll('{cards}', cards.join(', '));
+      }
+      if (extras['text'] != null) {
+        out = out.replaceAll('{text}', '${extras['text']}');
+      }
+      if (extras['topic'] != null) {
+  final raw = '${extras['topic']}';
+  String label;
+  switch (locale) {
+    case 'tr':
+      switch (raw) { case 'love': label='Aşk'; break; case 'work': label='İş'; break; case 'money': label='Para'; break; case 'health': label='Sağlık'; break; default: label='Genel'; }
+      break;
+    case 'es':
+      switch (raw) { case 'love': label='Amor'; break; case 'work': label='Trabajo'; break; case 'money': label='Dinero'; break; case 'health': label='Salud'; break; default: label='General'; }
+      break;
+    default:
+      switch (raw) { case 'love': label='Love'; break; case 'work': label='Work'; break; case 'money': label='Money'; break; case 'health': label='Health'; break; default: label='General'; }
+  }
+  out = out.replaceAll('{topic}', label);
+}
+    }
+    return out;
+  }
+
+  static String _coffeeLegacy(String locale, String name, String dow, Random rnd) {
+    switch (locale) {
+      case 'tr':
+        return '$name, fincandaki izler $dow akisi ile uyumlu. Kucuk ve somut bir adim iyi gelir.\nNot: Eglence amaclidir.';
+      case 'es':
+        return '$name, las huellas en tu taza reflejan el ritmo de $dow. Un paso pequeno y concreto viene bien.\nNota: Entretenimiento.';
+      case 'ar':
+        return '$nameØŒ Ù†Ù…Ø· Ø§Ù„ÙÙ†Ø¬Ø§Ù† ÙŠØ¹ÙƒØ³ Ø§ÙŠÙ‚Ø§Ø¹ $dow. Ø®Ø·ÙˆØ© ØµØºÙŠØ±Ø© ÙˆÙˆØ§Ø¶Ø­Ø© Ù…Ù†Ø§Ø³Ø¨Ø©.\nÙ…Ù„Ø§Ø­Ø¸Ø©: Ù„Ù„ØªØ±ÙÙŠÙ‡.';
+      default:
+        return '$name, the cup patterns mirror the flow of $dow. A small, concrete step fits the day.\nNote: Entertainment.';
+    }
+  }
+
+  // New topic-aware coffee generator (fallback when no template is provided)
+  static String _coffee(String locale, String name, String dow, Random rnd, Map<String, dynamic>? extras, Map<String, dynamic> i18n) {
+  String i(String key, String fallback) {
+    final v = i18n[key];
+    return (v is String && v.trim().isNotEmpty) ? v : fallback;
+  }
+  final raw = (extras?['topic'] ?? 'general').toString();
+  String topicLabel() {
+    switch (locale) {
+      case 'tr':
+        switch (raw) {
+          case 'love': return 'Aşk';
+          case 'work': return 'İş';
+          case 'money': return 'Para';
+          case 'health': return 'Sağlık';
+          default: return 'Genel';
+        }
+      case 'es':
+        switch (raw) {
+          case 'love': return 'Amor';
+          case 'work': return 'Trabajo';
+          case 'money': return 'Dinero';
+          case 'health': return 'Salud';
+          default: return 'General';
+        }
+      default:
+        switch (raw) {
+          case 'love': return 'Love';
+          case 'work': return 'Work';
+          case 'money': return 'Money';
+          case 'health': return 'Health';
+          default: return 'General';
+        }
+    }
+  }
+  final t = topicLabel();
+
+  // A few variant sentences for diversity
+  String pick(List<String> options) => options[ rnd.nextInt(options.length) ];
+
+  if (locale == 'tr') {
+    final intro = pick([
+      '$name, fincandaki izler $dow gününün ritmiyle uyumlu. Tema: $t.',
+      '$name, bugün $dow; fincanın kenarındaki izler $t konusunda sakin ama belirgin işaretler veriyor.',
+      '$name, $dow akışı ve fincandaki desenler $t odağında net bir çerçeve çiziyor.'
+    ]);
+    final rim = pick([
+      'Kenar izlerinde tekrarlayan kıvrımlar, gün içi alışkanlıkları ve aynı yörüngede dönen düşünceleri işaret ediyor.',
+      'Ağız kenarında birbirini takip eden küçük çizgiler, niyetini sadeleştirince yolun açılacağını söylüyor.',
+      'Kenar hattındaki kesik kesik izler, hızlı kararlar yerine odaklı bir adımı öneriyor.'
+    ]);
+    final base = pick([
+      'Tabana çöken telve yoğunluğu, son günlerde biriken konuyu hafifletmen için küçük ama biten bir işi seçmeni öneriyor.',
+      'Tabandaki açık alan, yeni bir nefeslik yer açıldığını; minik bir ilerleme için uygun zamanı gösteriyor.',
+      'Taban çizgilerinin birleştiği nokta, tek cümlelik bir niyetle başlanacak işi işaret ediyor.'
+    ]);
+    final symbol = pick([
+      'Birkaç küçük nokta bir araya gelmiş: bu, detayların birleşince büyük resmi göstereceğine dair bir işarettir.',
+      'İnce bir yay şekli görünüyor; esneklik ve zarif bir geri dönüşle ilerleme sağlayabilirsin.',
+      'Kısa çizgi kümeleri, dağınık enerjiyi toplaman için tek odak zamanlarını çağırıyor.'
+    ]);
+    final actionTopic = pick([
+      'Aşk için', 'İş alanında', 'Maddi konularda', 'Sağlık ve ritimde', 'Genel akışta'
+    ]);
+    final action = pick([
+      '20 dakikalık tek odak bir blok aç ve sonunda bir cümlelik not bırak.',
+      'bugün tek bir mesajı nazik ve net şekilde gönder.',
+      'ufak bir görevi tamamen bitir ve akşam 3 cümleyle günü kapat.',
+      'kısa bir yürüyüş + su molasıyla zihin-nefes dengesini tazele.'
+    ]);
+    final closing = 'Not: Eğlence amaçlıdır; içgörüleri kendi sezginle harmanla.';
+
+    return [
+      intro,
+      rim,
+      base,
+      symbol,
+      '$actionTopic $action',
+      closing,
+    ].join('\n\n');
+  }
+
+  // EN (default)
+  final introEn = pick([
+    '$name, the cup traces align with the rhythm of $dow. Topic: $t.',
+    '$name, on $dow the rim shows calm yet clear signs around $t.',
+  ]);
+  final rimEn = pick([
+    'Repeating arcs suggest patterns in daily habits; simplify your intention to unlock flow.',
+    'Tiny lines along the rim nudge you toward one focused step instead of many half-starts.'
+  ]);
+  final baseEn = pick([
+    'Sediment density at the base hints that a small, fully-finished task will lift the weight.',
+    'A clear pocket at the base signals fresh space; start with a one-sentence intention.'
+  ]);
+  final symbolEn = pick([
+    'A faint arc appears — flexibility and a gentle return will help momentum.',
+    'Short line clusters invite a single-focus block to gather scattered energy.'
+  ]);
+  final closingEn = 'Note: For entertainment; combine insights with your own judgment.';
+  return [introEn, rimEn, baseEn, symbolEn, closingEn].join('\n\n');
+}static String _tarot(String locale, String name, List<String>? cards, String dow, Random rnd) {
+    final list = (cards != null && cards.isNotEmpty) ? ' ${cards.join(', ')}' : '';
+    switch (locale) {
+      case 'tr':
+        return '$name, kartlar$list netlik ve odak oneriyor. Bugun tek bir isi tamamlarsan hiz kazanirsin.';
+      case 'es':
+        return '$name, las cartas$list sugieren claridad y enfoque. Completar una cosa te da impulso.';
+      case 'ar':
+        return '$nameØŒ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø§Øª$list ØªÙ‚ØªØ±Ø­ ÙˆØ¶ÙˆØ­Ø§Ù‹ ÙˆØªØ±ÙƒÙŠØ²Ø§Ù‹. Ø§ÙƒÙ…Ø§Ù„ Ø´ÙŠØ¡ ÙˆØ§Ø­Ø¯ ÙŠÙ…Ù†Ø­Ùƒ Ø¯ÙØ¹Ø§Ù‹.';
+      default:
+        return '$name, the cards$list suggest clarity and focus. Completing one thing helps.';
+    }
+  }
+
+  static String _palm(String locale, String name, String dow, Random rnd) {
+    switch (locale) {
+      case 'tr':
+        return '$name, avuc cikislari denge ve toparlanmayi isaret ediyor. Kalpte sefkat, zihinde sade hedefler.';
+      case 'es':
+        return '$name, las lineas de tu palma indican equilibrio y recuperacion. Compasion y metas simples.';
+      case 'ar':
+        return '$nameØŒ Ø®Ø·ÙˆØ· Ø§Ù„ÙƒÙ ØªØ´ÙŠØ± Ø§Ù„Ù‰ ØªÙˆØ§Ø²Ù† ÙˆØªØ¹Ø§ÙÙŠ. ØªØ¹Ø§Ø·Ù ÙˆØ§Ù‡Ø¯Ø§Ù Ø¨Ø³ÙŠØ·Ø©.';
+      default:
+        return '$name, your palm lines indicate balance and recovery. Compassion in heart, simple goals in mind.';
+    }
+  }
+
+  static String _dream(String locale, String name, String text, String dow, Random rnd) {
+    final bullet = text.trim().isNotEmpty ? '\n- ${text.trim()}' : '';
+    switch (locale) {
+      case 'tr':
+        return '$name, ruyandaki imgeler duygusal arinmaya davet ediyor.$bullet\nKucuk bir aksam ritueli gunu iyi kapatir.';
+      case 'es':
+        return '$name, las imagenes del sueno invitan a una limpieza emocional.$bullet';
+      case 'ar':
+        return '$nameØŒ ØµÙˆØ± Ø§Ù„Ø­Ù„Ù… ØªØ¯Ø¹Ùˆ Ø§Ù„Ù‰ ØªÙ†Ù‚ÙŠØ© Ø¹Ø§Ø·ÙÙŠØ©.$bullet';
+      default:
+        return '$name, your dream images invite emotional cleansing.$bullet\nA small evening ritual helps end the day well.';
+    }
+  }
+
+  static String _astro(String locale, String name, String zodiac, String dow, Random rnd) {
+    final z = zodiac.isEmpty ? ({'tr': 'burcun', 'es': 'tu signo', 'ar': 'your sign', 'en': 'your sign'}[lang] ?? 'your sign') : zodiac;
+    switch (locale) {
+      case 'tr':
+        return '$name, bugun $z icin hafif ama net bir yon beliriyor. Kucuk bir is tamamlamak iyi gelir.';
+      case 'es':
+        return '$name, hoy surge una direccion suave pero clara para $z. Completar algo pequeno ayuda.';
+      case 'ar':
+        return '$nameØŒ Ù‚Ø¯ ØªØ¸Ù‡Ø± Ø§Ù„ÙŠÙˆÙ… ÙˆØ¬Ù‡Ø© Ù„Ø·ÙŠÙØ© ÙˆÙˆØ§Ø¶Ø­Ø© Ù„Ù€ $z. Ø§Ù†Ù‡Ø§Ø¡ Ø´ÙŠØ¡ ØµØºÙŠØ± ÙŠØ³Ø§Ø¹Ø¯.';
+      default:
+        return '$name, a gentle but clear direction may emerge for $z today. Completing one small thing helps.';
+    }
+  }
+
+  static String _generic(String locale, String name, String dow, Random rnd) {
+    switch (locale) {
+      case 'tr':
+        return '$name, $dow ile uyumlu kucuk ve somut adimlar sec.';
+      case 'es':
+        return '$name, elige pasos pequenos y concretos acordes al flujo de $dow.';
+      case 'ar':
+        return '$nameØŒ Ø§Ø®ØªØ± Ø®Ø·ÙˆØ§Øª ØµØºÙŠØ±Ø© ÙˆÙˆØ§Ø¶Ø­Ø© Ù…Ù†Ø³Ø¬Ù…Ø© Ù…Ø¹ Ø§ÙŠÙ‚Ø§Ø¹ $dow.';
+      default:
+        return '$name, choose small, concrete steps aligned with the flow of $dow.';
+    }
+  }
+
+  static String _applyDreamStyle(String locale, String base, String style) {
+    if (style == 'poetic') {
+      final add = ({
+        'tr': '\n\nGecenin sessizliginde sembolun yavasca beliriyor;\nher satir, icindeki sese bir adim daha yakin.\nKucuk ama icten bir adim: bir cumlelik niyet ve nazik bir nefes.',
+        'es': '\n\nEn el silencio de la noche tu simbolo aparece;\ncada linea te acerca a tu voz interior.\nUn paso pequeno: una intencion y una respiracion suave.',
+        'ar': '\n\nIn the night silence, your symbol appears;\neach line brings you closer to your inner voice.\nOne small step: one intention and a soft breath.',
+        'en': '\n\nIn the night silence your symbol appears;\neach line draws you closer to your inner voice.\nOne small step: one intention and a soft breath.',
+      }[lang] ?? '\n\nIn the night silence your symbol appears; each line draws you closer to your inner voice. One small step: one intention and a soft breath.');
+      return base.trim() + add;
+    }
+    // practical (default): add bullet points
+    final add = ({
+      'tr': ['\n- Gun icinde sembolune iki kez dikkat et', '- Duyguyu tek kelime ile adlandir', '- Aksam 3 cumle ile kisa bir ozet yaz'],
+      'es': ['\n- Observa tu simbolo dos veces', '- Nombra la emocion en una palabra', '- Escribe un cierre de 3 frases al anochecer'],
+      'ar': ['\n- Notice your symbol twice', '- Name the feeling in one word', '- Write a 3-sentence evening review'],
+      'en': ['\n- Notice your symbol twice', '- Name the feeling in one word', '- Write a 3-sentence evening review'],
+    }[lang] ?? ['\n- Notice your symbol twice','- Name the feeling in one word','- Write a 3-sentence evening review']);
+    return base.trim() + add.join('\n');
+  }
+
+  static String _applyAstroStyle(String locale, String base, String style) {
+    if (style == 'spiritual') {
+      final add = ({
+        'tr': '\n\nBugun yildizlar nazik bir ritim fisildiyor;\nniyetini sakin bir cumleyle netlestir ve gune oyle basla.',
+        'es': '\n\nHoy las estrellas susurran un ritmo suave; aclara tu intencion en una frase y empieza asi.',
+        'ar': '\n\nToday the stars whisper a gentle rhythm; clarify your intention in one sentence and begin.',
+        'en': '\n\nToday the stars whisper a gentle rhythm; clarify your intention in one sentence and begin.',
+      }[lang] ?? '\n\nToday the stars whisper a gentle rhythm; clarify your intention in one sentence and begin.');
+      return base.trim() + add;
+    }
+    // practical
+    final add = ({
+      'tr': ['\n- 15-20 dk tek odak planla', '- Oglen 5 dk yuruyus ekle', '- Aksam 3 cumlelik kapanis yaz'],
+      'es': ['\n- Bloque de 15-20 min de enfoque', '- Añade caminata de 5 min al mediodia', '- Cierre de 3 frases por la noche'],
+      'ar': ['\n- Plan a 15-20 min single-focus block', '- Add a 5-min walk at noon', '- 3-sentence evening review'],
+      'en': ['\n- Plan a 15-20 min single-focus block', '- Add a 5-min walk at noon', '- 3-sentence evening review'],
+    }[lang] ?? ['\n- Plan a 15-20 min single-focus block','- Add a 5-min walk at noon','- 3-sentence evening review']);
+    return base.trim() + add.join('\n');
+  }
+
+  
+  static String _applyCoffeeStyle(String locale, String base, String style) {
+    if (style == 'spiritual') {
+      final add = ({
+        'tr': '\n\nFincanin sessizliginde niyetin berraklasiyor; kokuyu ve sicakligi dinle, bir cumlelik niyet yaz.',
+        'en': "\n\nIn the cup's silence your intention clears; listen to aroma and warmth, write one clear line.",
+      }[lang] ?? "\n\nIn the cup's silence your intention clears; write one clear line.");
+      return base.trim() + add;
+    }
+    if (style == 'analytical') {
+      final add = ({
+        'tr': ['\n- Kenar izleri: tekrar eden sekli bul', '- Taban: yogunluk/bosluk dengesi', '- Sonuc: tek net cumle yaz'],
+        'en': ['\n- Rim: find repeating trace', '- Base: density vs. void', '- Outcome: one clear sentence'],
+      }[lang] ?? ['\n- Rim: find repeating trace','- Base: density vs. void','- Outcome: one clear sentence']);
+      return base.trim() + add.join('
+');
+    }
+    final add = ({
+      'tr': ['\n- 10-15 dk tek odak ayir', '- Birine nazik bir mesaj gonder', '- Aksam 3 cumlelik kapanis yaz'],
+      'en': ['\n- 10-15 min single-focus', '- Send a kind message', '- 3-sentence evening review'],
+    }[lang] ?? ['\n- 10-15 min single-focus','- Send a kind message','- 3-sentence evening review']);
+    return base.trim() + add.join('
+');
+  }
+
+  static String _applyTarotStyle(String locale, String base, String style) {
+    if (style == 'spiritual') {
+      final add = ({
+        'tr': '\n\nKartlarin fisiltisi: niyetini bir cumlede netlestir ve tek adim at.',
+        'en': '\n\nWhisper of the spread: clarify a one-line intention and take one step.',
+      }[lang] ?? '\n\nClarify a one-line intention and take one step.');
+      return base.trim() + add;
+    }
+    if (style == 'analytical') {
+      final add = ({
+        'tr': ['\n- Gecmis: ana tema', '- Simdi: odak ve risk', '- Gelecek: tek mini-adim'],
+        'en': ['\n- Past: main theme', '- Present: focus & risk', '- Future: one micro-step'],
+      }[lang] ?? ['\n- Past: main theme','- Present: focus & risk','- Future: one micro-step']);
+      return base.trim() + add.join('
+');
+    }
+    final add = ({
+      'tr': ['\n- Bir kart mesajini tek cumle yaz', '- 20 dk tek odak planla', '- Aksam 3 cumlelik geri-bakis'],
+      'en': ['\n- One-sentence card message', '- Plan 20 min single-focus', '- 3-sentence evening review'],
+    }[lang] ?? ['\n- One-sentence card message','- Plan 20 min single-focus','- 3-sentence evening review']);
+    return base.trim() + add.join('
+');
+  }
+
+  static String _applyPalmStyle(String locale, String base, String style) {
+    if (style == 'spiritual') {
+      final add = ({
+        'tr': '\n\nAvucun hafiza gibi: kalp ve akil cizgisi bugun ayni sozu soyluyor—nazik netlik.',
+        'en': "\n\nYour palm like a memory: heart and head lines echo gentle clarity today.",
+      }[lang] ?? '\n\nGentle clarity for heart and head lines today.');
+      return base.trim() + add;
+    }
+    if (style == 'analytical') {
+      final add = ({
+        'tr': ['\n- Kalp cizgisi: iletisim ornegi', '- Bas cizgisi: plan ve sure', '- Basparmak: gunun tek karari'],
+        'en': ["\n- Heart line: comms example", '- Head line: plan & duration', "- Thumb: today's single decision"],
+      }[lang] ?? ["\n- Heart line: comms example",'- Head line: plan & duration',"- Thumb: today's single decision"]);
+      return base.trim() + add.join('
+');
+    }
+    final add = ({
+      'tr': ['\n- 20 dk tek-odak sprint', '- Nazik bir mesaj gonder', '- 3 cumlelik aksam kapanisi'],
+      'en': ['\n- 20 min single-focus', '- Send a kind message', '- 3-sentence evening close'],
+    }[lang] ?? ['\n- 20 min single-focus','- Send a kind message','- 3-sentence evening close']);
+    return base.trim() + add.join('
+');
+  }static String _appendPremiumTyped(String type, String locale, String base, Map<String, dynamic> i18n) {
+    String pick(String k, String fb) {
+      final v = i18n[k];
+      return (v is String && v.trim().isNotEmpty) ? v : fb;
+    }
+    final header = pick('premium.header', ({
+      'tr': 'Derinlestirme',
+      'es': 'Profundizacion',
+      'ar': 'ØªØ¹Ù…ÙŠÙ‚',
+      'en': 'Deepening',
+    }[lang] ?? 'Deepening'));
+
+    String sectionTitle() {
+      switch (type) {
+        case 'coffee': return pick('premium.coffee.section', 'Beyond the Cup');
+        case 'tarot': return pick('premium.tarot.section', 'Roadmap');
+        case 'palm': return pick('premium.palm.section', 'Hand Analysis');
+        case 'dream': return pick('premium.dream.section', 'Symbol Journal');
+        case 'astro': return pick('premium.astro.section', 'Daily Focus');
+        default: return pick('premium.default.section', 'Deepening');
+      }
+    }
+
+    final closing = pick('premium.closing', ({
+      'tr': 'Bugun tek somut adim sec ve uygula.',
+      'es': 'Elige un paso concreto hoy y aplicalo.',
+      'ar': 'Ø§Ø®ØªØ± Ø®Ø·ÙˆØ© ÙˆØ§Ø¶Ø­Ø© ÙˆØ§Ø­Ø¯Ø© Ø§Ù„ÙŠÙˆÙ… ÙˆØ·Ø¨Ù‚Ù‡Ø§.',
+      'en': 'Choose one concrete step today and apply it.',
+    }[lang] ?? 'Choose one concrete step today and apply it.'));
+
+    return [
+      base.trim(),
+      '',
+      header,
+      sectionTitle(),
+      closing,
+    ].join('\n');
+  }
+
+  static String _liveChat(String locale, String name, String zodiac, String tone, String length, String dow, Random rnd, Map<String, dynamic> i18n) {
+    String i(String key, String fb) {
+      final v = i18n[key];
+      return (v is String && v.trim().isNotEmpty) ? v : fb;
+    }
+
+    String opener;
+    if (tone == 'spiritual') {
+      opener = i('live.opener.spiritual', ({
+        'tr': '$name, niyetin $dow ile uyumlu. Kucuk ve somut bir adim simdi iyi olur.',
+        'es': '$name, tu intencion fluye con $dow. Un paso pequeno y concreto viene bien.',
+        'ar': '$nameØŒ Ù†ÙŠØªÙƒ Ù…Ù†Ø³Ø¬Ù…Ø© Ù…Ø¹ Ø§ÙŠÙ‚Ø§Ø¹ $dow. Ø®Ø·ÙˆØ© ØµØºÙŠØ±Ø© ÙˆÙˆØ§Ø¶Ø­Ø© Ù…Ù†Ø§Ø³Ø¨Ø© Ø§Ù„Ø§Ù†.',
+        'en': '$name, your intention aligns with the flow of $dow. A small, concrete step fits now.',
+      }[lang] ?? 'Your intention aligns with the day.'));
+    } else if (tone == 'humorous') {
+      opener = i('live.opener.humorous', ({
+        'tr': '$name, kahveni yudumla; evren bazen ince bir mizahla goz kirpar.',
+        'es': '$name, da un sorbo al cafe; el universo a veces guiÃ±a un ojo con humor.',
+        'ar': '$nameØŒ Ø§Ø±ØªØ´Ù Ù‚Ù‡ÙˆØªÙƒØ› ÙØ§Ù„ÙƒÙˆÙ† Ø§Ø­ÙŠØ§Ù†Ø§Ù‹ ÙŠØºÙ…Ø² Ø¨Ø¯Ø¹Ø§Ø¨Ø©.',
+        'en': '$name, sip your coffee; the universe sometimes winks with humor.',
+      }[lang] ?? 'Letâ€™s keep it light.'));
+    } else {
+      opener = i('live.opener.default', ({
+        'tr': '$name, dostca soyleyeyim: kucuk ve net bir adim en iyi baslangictir.',
+        'es': '$name, con franqueza: un paso pequeno y claro es el mejor comienzo.',
+        'ar': '$nameØŒ Ø¨ØµØ±Ø§Ø­Ø©: Ø®Ø·ÙˆØ© ØµØºÙŠØ±Ø© ÙˆÙˆØ§Ø¶Ø­Ø© Ù‡ÙŠ Ø§ÙØ¶Ù„ Ø¨Ø¯Ø§ÙŠØ©.',
+        'en': '$name, honestly: a small, clear step is the best start.',
+      }[lang] ?? 'A small, clear step is best.'));
+    }
+    opener = opener.replaceAll('{name}', name).replaceAll('{dow}', dow);
+
+    List<String> tipsFromI18n() {
+      final out = <String>[];
+      for (var k = 0; k < 6; k++) {
+        final v = i18n['live.tip.$k'];
+        if (v is String && v.trim().isNotEmpty) out.add(v);
+      }
+      return out;
+    }
+    final fallback = ({
+      'tr': [
+        "3 derin nefes al ve 'Birakiyorum' diyerek ver.",
+        'Konunu tek cumleyle yaz ve telefonuna not et.',
+        '10 dakikalik tek-odak zamani ayir; bildirimleri kapat.',
+      ],
+      'es': [
+        "Respira 3 veces y suelta diciendo 'Suelto'.",
+        'Redacta tu tema en una frase y anotalo.',
+        'Reserva 10 minutos de enfoque unico; silencia notificaciones.',
+      ],
+      'ar': [
+        "ØªÙ†ÙØ³ Ø«Ù„Ø§Ø« Ù…Ø±Ø§Øª ÙˆØ§Ø²ÙØ± Ù‚Ø§Ø¦Ù„Ø§ 'Ø§ØªØ±Ùƒ'.",
+        'Ø§ÙƒØªØ¨ Ù…ÙˆØ¶ÙˆØ¹Ùƒ Ø¨Ø¬Ù…Ù„Ø© ÙˆØ§Ø­Ø¯Ø© ÙˆØ¯ÙˆÙ‘Ù†Ù‡.',
+        'Ø§Ø­Ø¬Ø² 10 Ø¯Ù‚Ø§Ø¦Ù‚ ØªØ±ÙƒÙŠØ² ÙˆØ§Ø­Ø¯Ø› Ø§ÙˆÙ‚Ù Ø§Ù„Ø§Ø´Ø¹Ø§Ø±Ø§Øª.',
+      ],
+      'en': [
+        "Take 3 deep breaths and exhale saying 'I release'.",
+        'Write your topic in one sentence and note it.',
+        'Block a 10-minute single-focus slot; silence notifications.',
+      ]
+    }[lang] ?? [
+      'Take a breath and center yourself.',
+      'Write one clear sentence about your question.',
+    ]);
+
+    final mergedTips = tipsFromI18n().isNotEmpty ? tipsFromI18n() : fallback;
+    final count = length == 'short' ? 1 : 2;
+    final sb = StringBuffer()
+      ..writeln(opener)
+      ..writeln()
+      ..writeln(i('live.tips_header', ({'tr': 'Oneriler:', 'es': 'Sugerencias:', 'ar': 'Ù†ØµØ§Ø¦Ø­:', 'en': 'Tips:'}[lang] ?? 'Tips:')));
+    for (var i0 = 0; i0 < count; i0++) {
+      sb.writeln('- ${mergedTips[rnd.nextInt(mergedTips.length)]}');
+    }
+    if (zodiac.isNotEmpty) {
+      final elem = _inferElementTr(zodiac);
+      if (elem.isNotEmpty) {
+        final astro = i('live.astro_note', ({
+          'tr': 'Astro notu: {elem} elementi bugun sezgini destekliyor.',
+          'es': 'Nota astro: el elemento {elem} apoya tu intuicion hoy.',
+          'ar': 'Ù…Ù„Ø§Ø­Ø¸Ø© ÙÙ„ÙƒÙŠØ©: Ø¹Ù†ØµØ± {elem} ÙŠØ¯Ø¹Ù… Ø­Ø¯Ø³Ùƒ Ø§Ù„ÙŠÙˆÙ….',
+          'en': 'Astro note: The {elem} element supports your intuition today.',
+        }[lang] ?? 'Astro note: intuition supported.'));
+        sb..writeln()..writeln(astro.replaceAll('{elem}', elem));
+      }
+    }
+    sb..writeln()..writeln(i('live.follow_up', ({
+      'tr': 'Asil sorunu tek cumleyle yazar misin?',
+      'es': 'Â¿Puedes compartir tu pregunta central en una frase?',
+      'ar': 'Ù‡Ù„ ÙŠÙ…ÙƒÙ†Ùƒ Ù…Ø´Ø§Ø±ÙƒØ© Ø³Ø¤Ø§Ù„Ùƒ Ø§Ù„Ø¬ÙˆÙ‡Ø±ÙŠ Ø¨Ø¬Ù…Ù„Ø© ÙˆØ§Ø­Ø¯Ø©ØŸ',
+      'en': 'Can you share your core question in one sentence?',
+    }[lang] ?? 'Share your core question in one sentence.')));
+
+    return sb.toString();
+  }
+}
+
+String _weekdayName({required String locale, required int weekday}) {
+  // 1..7 Monday..Sunday per Dart DateTime
+  final idx = ((weekday - 1) % 7).clamp(0, 6);
+  final tr = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+  final es = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
+  final en = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  switch (locale) {
+    case 'tr': return tr[idx];
+    case 'es': return es[idx];
+    default: return en[idx];
+  }
+}
+
+String _inferElementTr(String zodiac) {
+  final z = zodiac.toLowerCase();
+  const fire = ['koc', 'aslan', 'yay'];
+  const earth = ['boga', 'basak', 'oglak'];
+  const air = ['ikizler', 'terazi', 'kova'];
+  const water = ['yengec', 'akrep', 'balik'];
+  if (fire.any((e) => z.contains(e))) return 'AteÅŸ';
+  if (earth.any((e) => z.contains(e))) return 'Toprak';
+  if (air.any((e) => z.contains(e))) return 'Hava';
+  if (water.any((e) => z.contains(e))) return 'Su';
+  return '';
+}
+
+
+
+
+
+
+

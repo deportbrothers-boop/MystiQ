@@ -1,0 +1,12 @@
+{
+  "live.tips_header": "Öneriler:",
+  "live.tip.0": "3 derin nefes al ve 'Bırakıyorum' diyerek ver.",
+  "live.tip.1": "Konuyu tek cümleyle yaz ve telefonuna not et.",
+  "live.tip.2": "10 dakikalık tek-odak zamanı ayır; bildirimleri kapat.",
+  "live.opener.spiritual": "{name}, niyetin {dow} gününün akışıyla uyumlu. Şimdi küçük ve somut bir adım atmak doğru olacak.",
+  "live.opener.humorous": "{name}, kahveni yudumla; evren bazen küçük bir espriyle göz kırpar.",
+  "live.opener.default": "{name}, dostça söyleyeyim: Şu anda net bir küçük adım en iyi başlangıç.",
+  "live.follow_up": "Aklındaki asıl soruyu tek cümleyle paylaşır mısın?",
+  "live.disclaimer": "Not: Bu sohbet eğlence amaçlıdır; kararlarında iç sezgini ve gerekirse uzman görüşünü öncele.",
+  "live.astro_note": "Astro notu: {elem} elementi bugün sezgini destekliyor."
+}

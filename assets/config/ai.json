@@ -1,0 +1,6 @@
+{
+  "serverUrl": "http://127.0.0.1:8787/generate",
+  "streamUrl": "http://127.0.0.1:8787/stream",
+  "model": "gpt-4o-mini",
+  "appToken": ""
+}
