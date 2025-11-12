@@ -3,13 +3,33 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdService {
-  static Future<InitializationStatus> init() => MobileAds.instance.initialize();
+  static Future<InitializationStatus> init() async {
+    final status = await MobileAds.instance.initialize();
+    try {
+      const raw = String.fromEnvironment('ADMOB_TEST_DEVICE_IDS');
+      final ids = raw.isEmpty
+          ? const <String>[]
+          : raw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          testDeviceIds: ids,
+          // Keep content family-friendly by default
+          maxAdContentRating: MaxAdContentRating.pg,
+          tagForChildDirectedTreatment: TagForChildDirectedTreatment.unspecified,
+          tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.unspecified,
+        ),
+      );
+    } catch (_) {}
+    return status;
+  }
 
   static String get bannerAdUnitId {
     if (Platform.isAndroid) {
-      return 'ca-app-pub-3940256099942544/6300978111'; // test
+      // MystiQ (Android) - Banner Ad Unit (prod)
+      return 'ca-app-pub-4678612524495888/8393122228';
     } else if (Platform.isIOS) {
-      return 'ca-app-pub-3940256099942544/2934735716'; // test
+      // MystiQ (iOS) - Banner Ad Unit (prod)
+      return 'ca-app-pub-4678612524495888/3711641189';
     }
     return ''; // other platforms not supported
   }
@@ -36,7 +56,11 @@ class _AdBannerState extends State<AdBanner> {
       size: widget.size,
       request: const AdRequest(),
       listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          debugPrint('[Banner] loaded: ${ad.adUnitId}');
+        },
         onAdFailedToLoad: (ad, err) {
+          debugPrint('[Banner] failed to load: ${err.code} ${err.message}');
           ad.dispose();
         },
       ),
@@ -60,4 +84,3 @@ class _AdBannerState extends State<AdBanner> {
     super.dispose();
   }
 }
-

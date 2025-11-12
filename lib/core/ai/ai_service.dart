@@ -1,11 +1,12 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import '../../features/profile/user_profile.dart';
-import 'local_generator.dart';
+// Local generator removed from runtime path to ensure all readings
+// come only from remote AI proxy. No local fallback is used.
 
 class AiConfig {
   final String serverUrl;
@@ -43,6 +44,7 @@ class AiService {
     Map<String, dynamic>? extras,
     String locale = 'tr',
   }) async {
+    // forceLocal bayragi artik dikkate alinmiyor; her zaman once uzak sunucu denenir
     // Optional remote server
     final cfg = await AiConfig.load();
     var server = cfg.serverUrl;
@@ -51,48 +53,47 @@ class AiService {
       server = server.replaceAll('127.0.0.1', '10.0.2.2');
     }
     if (server.isNotEmpty) {
-      try {
-        final r = await http.post(
-          Uri.parse(server),
-          headers: {
-            HttpHeaders.contentTypeHeader: 'application/json',
-            if (cfg.appToken.isNotEmpty) HttpHeaders.authorizationHeader: 'Bearer ${cfg.appToken}',
-          },
-          body: json.encode({
-            'type': type,
-            'profile': profile.toJson(),
-            'inputs': await _prepareInputs(extras),
-            'locale': locale,
-            'context': _contextInfo(locale: locale),
-            'model': cfg.model,
-          }),
-        );
-        final j = json.decode(r.body) as Map<String, dynamic>;
-        final text = (j['text'] as String?)?.trim();
-        if (text != null && text.isNotEmpty) return text;
-      } catch (_) {}
-    }
-
-    // Template-based fallback (i18n-driven) to avoid legacy mojibake
-    if (extras != null && extras['i18n'] is Map) {
-      final Map<String, dynamic> i18n = Map<String, dynamic>.from(extras['i18n'] as Map);
-      String? tpl = i18n['ai.template.$type'] as String?;
-      if (tpl != null && tpl.isNotEmpty) {
-        var out = tpl;
-        out = out.replaceAll('{name}', (profile.name.isEmpty) ? (i18n['ai.dear_soul'] as String? ?? 'Dear soul') : profile.name);
-        final now = DateTime.now();
-        final dow = _weekdayName(locale: locale, weekday: now.weekday);
-        out = out.replaceAll('{dow}', dow);
-        out = out.replaceAll('{zodiac}', profile.zodiac.isEmpty ? 'sign' : profile.zodiac);
-        if (extras['cards'] is List) {
-          final cards = (extras['cards'] as List).map((e) => '$e').toList();
-          out = out.replaceAll('{cards}', cards.join(', '));
+      // Tek tekrar denemesi + daha uzun zaman aşımı (Render gibi cold start senaryoları için)
+      final payload = {
+        'type': type,
+        'profile': profile.toJson(),
+        'inputs': await _prepareInputs(extras),
+        'locale': locale,
+        'context': _contextInfo(locale: locale),
+        'model': cfg.model,
+      };
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          final r = await http
+              .post(
+                Uri.parse(server),
+                headers: {
+                  HttpHeaders.contentTypeHeader: 'application/json',
+                  if (cfg.appToken.isNotEmpty) HttpHeaders.authorizationHeader: 'Bearer ${cfg.appToken}',
+                },
+                body: json.encode(payload),
+              )
+              .timeout(const Duration(seconds: 20));
+          if (r.statusCode >= 200 && r.statusCode < 300) {
+            final j = json.decode(r.body) as Map<String, dynamic>;
+            final text = (j['text'] as String?)?.trim();
+            if (text != null && text.isNotEmpty) {
+              // Only coffee closes are added later in ResultPage; return raw text here
+              return text;
+            }
+          } else {
+            // Sunucu anlamlı hata dondurduysa (401/503 vb.), tekrar denemeyi kesmek mantıklı
+            if (r.statusCode == 401 || r.statusCode == 403 || r.statusCode == 503) break;
+          }
+        } catch (_) {
+          // ilk deneme zaman aşımı/bağlantı sorununda bir kez daha dene
         }
-        return out;
+        // küçük bekleme sonrası bir deneme daha
+        await Future.delayed(const Duration(seconds: 2));
       }
     }
-    // Fallback local generator
-    return LocalAIGenerator.generate(type: type, profile: profile, extras: extras, locale: locale);
+    // No local fallback: return a user-facing message when remote is unavailable
+    return 'Uretim su anda yapilamiyor. Lutfen biraz sonra tekrar dene.';
   }
 
   // Live chat streaming (local streaming if no API key). Options allow tone/length.
@@ -103,23 +104,76 @@ class AiService {
     String locale = 'tr',
     Map<String, dynamic>? options,
   }) async* {
-    final base = LocalAIGenerator.generate(
-      type: 'live_chat',
-      profile: profile,
-      extras: {'text': text, 'history': history, if (options != null) ...options},
-      locale: locale,
-    );
-    final words = base.split(' ');
-    final buffer = StringBuffer();
-    for (var i = 0; i < words.length; i++) {
-      buffer.write(words[i]);
-      if (i < words.length - 1) buffer.write(' ');
-      if (i % 6 == 0 || i == words.length - 1) {
-        yield buffer.toString();
-        await Future.delayed(const Duration(milliseconds: 18));
-      }
+    // Prefer remote streaming if configured
+    final cfg = await AiConfig.load();
+    var streamUrl = cfg.streamUrl;
+    if (streamUrl.contains('127.0.0.1') && Platform.isAndroid) {
+      streamUrl = streamUrl.replaceAll('127.0.0.1', '10.0.2.2');
     }
-    yield "${buffer.toString()}\n\nNot: Bu sohbet eğlence amaçlıdır; kararlarında iç sezgini ve gerekirse uzman görüşünü izle.";
+    if (streamUrl.isNotEmpty) {
+      try {
+        final req = {
+          'type': 'live_chat',
+          'profile': profile.toJson(),
+          'inputs': {
+            'text': text,
+            'history': history,
+            if (options != null) ...options,
+          },
+          'locale': locale,
+          'context': _contextInfo(locale: locale),
+          'model': cfg.model,
+        };
+        final client = http.Client();
+        try {
+          final httpReq = http.Request('POST', Uri.parse(streamUrl));
+          httpReq.headers[HttpHeaders.contentTypeHeader] = 'application/json';
+          if (cfg.appToken.isNotEmpty) {
+            httpReq.headers[HttpHeaders.authorizationHeader] = 'Bearer ${cfg.appToken}';
+          }
+          httpReq.body = json.encode(req);
+          final streamed = await client.send(httpReq).timeout(const Duration(seconds: 20));
+          if (streamed.statusCode >= 200 && streamed.statusCode < 300) {
+            final buf = StringBuffer();
+            var carry = '';
+            await for (final chunk in streamed.stream.transform(const Utf8Decoder())) {
+              final combined = carry + chunk;
+              final lines = combined.split(RegExp('\\r?\\n'));
+              carry = lines.isNotEmpty ? lines.removeLast() : '';
+              for (final raw in lines) {
+                final line = raw.trim();
+                if (line.isEmpty) continue;
+                String piece = line;
+                if (piece.startsWith('data:')) {
+                  piece = piece.substring(5);
+                  try {
+                    final j = json.decode(piece);
+                    final val = (j is Map<String, dynamic>) ? (j['delta'] ?? j['text'] ?? j['content'] ?? j['data']) : null;
+                    if (val is String) piece = val;
+                  } catch (_) {}
+                }
+                if (piece.isEmpty) continue;
+                buf.write(piece);
+                yield buf.toString();
+              }
+            }
+            if (carry.isNotEmpty) {
+              buf.write(carry);
+              yield buf.toString();
+            }
+            client.close();
+            return;
+          }
+        } on TimeoutException {
+          try { client.close(); } catch (_) {}
+        } finally {
+          try { client.close(); } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
+    // No local streaming fallback. Yield a short error message once.
+    yield 'Sohbet su anda kullanilamiyor. Lutfen daha sonra tekrar deneyin.';
   }
 
   // Simple text streaming for readings. Tries remote stream, falls back to local chunking.
@@ -155,7 +209,7 @@ class AiService {
           httpReq.body = json.encode(req);
           final streamed = await client
               .send(httpReq)
-              .timeout(const Duration(seconds: 12));
+              .timeout(const Duration(seconds: 20));
           if (streamed.statusCode >= 200 && streamed.statusCode < 300) {
             final buf = StringBuffer();
             var carry = '';
@@ -169,7 +223,7 @@ class AiService {
                 if (line.isEmpty) continue;
                 String piece = line;
                 if (piece.startsWith('data:')) {
-                  piece = piece.substring(5).trim();
+                  piece = piece.substring(5);
                   // If server sends JSON chunks, try to extract a text field
                   try {
                     final j = json.decode(piece);
@@ -182,15 +236,13 @@ class AiService {
                   }
                 }
                 if (piece.isEmpty) continue;
-                // Accumulate to a growing buffer and yield progressively
-                if (buf.isNotEmpty) buf.write(' ');
+                // Accumulate to a growing buffer and yield progressively without injecting spaces
                 buf.write(piece);
                 yield buf.toString();
               }
             }
-            if (carry.trim().isNotEmpty) {
-              if (buf.isNotEmpty) buf.write(' ');
-              buf.write(carry.trim());
+            if (carry.isNotEmpty) {
+              buf.write(carry);
               yield buf.toString();
             }
             client.close();
@@ -206,7 +258,7 @@ class AiService {
                   },
                   body: json.encode(req),
                 )
-                .timeout(const Duration(seconds: 12));
+                .timeout(const Duration(seconds: 20));
             final body = r.body.trim();
             if (body.isNotEmpty) {
               final parts = body.split(RegExp("\\s+"));
@@ -287,6 +339,19 @@ class AiService {
     } else if (extras['text'] != null) {
       out['text'] = extras['text'];
     }
+    // Coffee-style persona hint to make outputs feel like a real cup reading
+    final typeHint = (extras['typeHint'] ?? '').toString();
+    if (typeHint == 'coffee') {
+      out['styleHintTr'] = 'Gercek bir kahve falcisi gibi, kullaniciya birebir (sen) diye hitap et. '
+          'Sanki fincan elindeymis gibi gozleme dayali, gercekci ve dogrudan yaz. '
+          'Madde madde degil, akici paragraflar kullan. '
+          'Markdown, kalin/italik, numarali veya madde isaretli listeler kullanma. '
+          'Genel/sozluk vari figur aciklamalarindan kacin; fincanin izlenimlerine odaklan. '
+          'Hayat dersi/motivasyon veya asiri pembe yaklasim yok; belirsizlikleri belirt ("olabilir", "isaret ediyor"). '
+          'Kesin kehanetler ve kati talimatlardan kacin.';
+      out['length'] = 'long';
+      out['formatHint'] = 'no_list_no_markdown_flowing_paragraphs';
+    }
     // Pass through optional numeric/contextual hints for better grounding
     if (extras.containsKey('energy')) out['energy'] = extras['energy'];
     if (extras.containsKey('length')) out['length'] = extras['length'];
@@ -306,12 +371,29 @@ class AiService {
   }
 }
 
+String _closingTailFor({required UserProfile profile, required String locale}) {
+  final name = (profile.name.trim().isEmpty) ? 'Dostum' : profile.name.trim();
+  // ASCII-safe kapanis mesaji
+  return '${name}, falinin sonlarina gelirken fincanindaki sekiller son bir kez konustu... Diyorlar ki: "Bu sadece baslangic."\n\n'
+      'Her kahve yeni bir yol, her niyet yeni bir kapidir.\n'
+      'Simdi derin bir nefes al, kalbinden dilegini gecir ve MystiQ\'e geri don...\n'
+      'Evren seninle konusmaya devam etmek istiyor.';
+}
+
+String _appendClosingTail(String text, {required UserProfile profile, required String locale}) {
+  final t = text.trimRight();
+  // Aynisini iki kez eklememek icin kontrol
+  if (t.contains('Evren seninle konusmaya devam etmek istiyor.')) return t;
+  final tail = _closingTailFor(profile: profile, locale: locale);
+  return '$t\n\n$tail';
+}
+
 String _weekdayName({required String locale, required int weekday}) {
   // 1..7 Monday..Sunday per Dart DateTime
-  final tr = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+  final tr = ['Pazartesi', 'SalÄ±', 'Ã‡arÅŸamba', 'PerÅŸembe', 'Cuma', 'Cumartesi', 'Pazar'];
   final en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  final es = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-  final ar = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
+  final es = ['Lunes', 'Martes', 'MiÃ©rcoles', 'Jueves', 'Viernes', 'SÃ¡bado', 'Domingo'];
+  final ar = ['Ø§Ù„Ø§Ø«Ù†ÙŠÙ†', 'Ø§Ù„Ø«Ù„Ø§Ø«Ø§Ø¡', 'Ø§Ù„Ø£Ø±Ø¨Ø¹Ø§Ø¡', 'Ø§Ù„Ø®Ù…ÙŠØ³', 'Ø§Ù„Ø¬Ù…Ø¹Ø©', 'Ø§Ù„Ø³Ø¨Øª', 'Ø§Ù„Ø£Ø­Ø¯'];
   List<String> names;
   switch (locale) {
     case 'tr': names = tr; break;
@@ -322,3 +404,8 @@ String _weekdayName({required String locale, required int weekday}) {
   final idx = ((weekday - 1) % 7).clamp(0, 6);
   return names[idx];
 }
+
+
+
+
+

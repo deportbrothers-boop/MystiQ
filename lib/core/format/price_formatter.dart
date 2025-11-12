@@ -23,7 +23,7 @@ class PriceFormatter {
     final cc = (loc.countryCode ?? '').toUpperCase();
     final lc = loc.languageCode.toLowerCase();
     String candidate;
-    if (cc == 'TR') {
+    if (cc == 'TR' || lc == 'tr') {
       candidate = 'TRY';
     } else if (cc == 'US') {
       candidate = 'USD';
@@ -46,9 +46,12 @@ class PriceFormatter {
     } else {
       candidate = 'USD';
     }
-    if (supported != null && supported.isNotEmpty && !supported.contains(candidate)) {
-      // pick first supported if candidate not available
-      return supported.first;
+    if (supported != null && supported.isNotEmpty) {
+      // Prefer TRY if available for Turkish users
+      if ((cc == 'TR' || lc == 'tr') && supported.contains('TRY')) return 'TRY';
+      if (!supported.contains(candidate)) {
+        return supported.first;
+      }
     }
     return candidate;
   }

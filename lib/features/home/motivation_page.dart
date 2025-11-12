@@ -1,106 +1,238 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../core/i18n/app_localizations.dart';
-import '../../core/entitlements/entitlements_controller.dart';
+import '../profile/profile_controller.dart';
 
-class MotivationPage extends StatelessWidget {
+class MotivationPage extends StatefulWidget {
   const MotivationPage({super.key});
+  @override
+  State<MotivationPage> createState() => _MotivationPageState();
+}
+
+class _MotivationPageState extends State<MotivationPage> {
+  String _text = '';
+  bool _loading = false;
+  StreamSubscription<String>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+    try {
+      String name = '';
+      String zodiac = '';
+      try {
+        final p = context.read<ProfileController>().profile;
+        name = p.name;
+        zodiac = p.zodiac;
+      } catch (_) {}
+      final locale = Localizations.localeOf(context).languageCode;
+      final now = DateTime.now();
+      final dateSeed = int.parse('${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}');
+      final idFactor = (name + '|' + zodiac).hashCode & 0x7fffffff;
+      final seed = (dateSeed ^ idFactor) & 0x7fffffff;
+      _text = _buildDailyMessage(locale: locale, name: name, zodiac: zodiac, seed: seed);
+    } catch (_) {}
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    try {
+      String name = '';
+      String zodiac = '';
+      try {
+        final p = context.read<ProfileController>().profile;
+        name = p.name;
+        zodiac = p.zodiac;
+      } catch (_) {
+        // Provider erişilemiyorsa varsayılana düş
+      }
+      final locale = Localizations.localeOf(context).languageCode;
+      final now = DateTime.now();
+      final dateSeed = int.parse('${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}');
+      final idFactor = (name + '|' + zodiac).hashCode & 0x7fffffff;
+      final seed = (dateSeed ^ idFactor) & 0x7fffffff;
+      final text = _buildDailyMessage(locale: locale, name: name, zodiac: zodiac, seed: seed);
+      if (!mounted) return;
+      setState(() => _text = text);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
     final now = DateTime.now();
-    final tipKey = 'daily.tip.${(((now.weekday - 1) % 7) + 1)}';
-    final tip = loc.t(tipKey);
     String date;
     try {
       date = DateFormat('EEEE, d MMM', Localizations.localeOf(context).toLanguageTag()).format(now);
     } catch (_) {
       date = DateFormat('EEEE, d MMM').format(now);
     }
-    final longText = _buildLongMotivation(context, tip);
     return Scaffold(
-      appBar: AppBar(title: Text(loc.t('motivation.title'))),
+      appBar: AppBar(
+        title: const Text('Gunluk Motivasyon'),
+        actions: [
+          IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(date, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+            Center(
+              child: Text(
+                date,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(longText, style: Theme.of(context).textTheme.bodyLarge),
+            Expanded(
+              child: _loading && _text.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Text(
+                          _text.isEmpty ? loc.t('common.empty') : _text,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // Compose a longer, day-variant motivation text using energy + weekday.
-  String _buildLongMotivation(BuildContext context, String dailyTip) {
-    final ent = context.read<EntitlementsController>();
-    final energy = ent.energy; // 0..100
-    final seed = DateTime.now().difference(DateTime(2022, 1, 1)).inDays;
-
-    String pick(List<String> items, int s) => items.isEmpty ? '' : items[s % items.length];
-    List<String> loadList(AppLocalizations loc, String base) {
-      final out = <String>[];
-      for (var i = 0; i < 12; i++) {
-        final k = '$base.$i';
-        final v = loc.t(k);
-        if (v == k) break; // stop when key missing
-        if (v.trim().isNotEmpty) out.add(v);
-      }
-      return out;
-    }
-
-    final loc = AppLocalizations.of(context);
-    var intros = loadList(loc, 'motivation.intro');
-    var actions = loadList(loc, 'motivation.action');
-    var closers = loadList(loc, 'motivation.closer');
-
-    // Fallbacks if i18n missing
-    intros = intros.isNotEmpty ? intros : [
-      'Bugun kendine nazikce yonel; kucuk ama net adimlar guzel degisimler baslatir.',
-      'Derin bir nefes al; niyetini tek cumleye indir ve gunu o netlikle tasimaya calis.',
-      'Zihnini hafiflet, kalbini ac; bugun yalnizca tek bir hedefe odaklan.'
-    ];
-    actions = actions.isNotEmpty ? actions : [
-      '3 derin nefes al ve "birakiyorum" diyerek ver.',
-      'Niyetini tek cumleyle yaz; telefonuna kaydet.',
-      '10 dakikalik tek-odak zamani ayir; bildirimleri kapat.',
-      'Bir bardak su ic; bedeni canlandir.',
-      '5 dakikalik yuruyuste yalnizca adimlarini say.',
-      'Bugun birine kisacik tesekkur et.'
-    ];
-    closers = closers.isNotEmpty ? closers : [
-      'Gun sonunda iki cumleyle kendini kutla.',
-      'Bugun bir adim attin; yarina hafiflik tasin.',
-      'Kisacik bir gulumsemeyle niyetini muhurle.'
-    ];
-
-    final intro = pick(intros, seed + (energy ~/ 10));
-    final a1 = pick(actions, seed + 1);
-    final a2 = pick(actions, seed + 3);
-    final a3 = pick(actions, seed + 5);
-    final closer = pick(closers, seed + 7);
-
-    final buf = StringBuffer()
-      ..writeln(dailyTip)
-      ..writeln()
-      ..writeln(intro)
-      ..writeln()
-      ..writeln('- $a1')
-      ..writeln('- $a2')
-      ..writeln('- $a3')
-      ..writeln()
-      ..writeln(closer);
-
-    final text = buf.toString().trim();
-    if (text.length < 360) {
-      final extra = pick(actions, seed + 9);
-      return '$text\n- $extra';
-    }
-    return text;
+  @override
+  void dispose() {
+    try { _sub?.cancel(); } catch (_) {}
+    super.dispose();
   }
 }
 
+String _buildDailyMessage({required String locale, required String name, required String zodiac, required int seed}) {
+  // Normalize locale
+  final lang = const ['tr','en','es','ar'].contains(locale) ? locale : 'en';
+  String you = name.isNotEmpty ? name : (
+    {
+      'tr': 'Sevgili ruh',
+      'es': 'Alma querida',
+      'ar': 'صديقي',
+      'en': 'Dear soul',
+    }[lang] ?? 'Dear soul'
+  );
+
+  List<String> introTr = [
+    'Bugün ritmini küçük adımlarla kur.',
+    'Niyetini tek cümlede netleştir.',
+    'Kafan doluysa, nefesle başla.',
+    'Gücün odaklandığın yerde büyür.',
+    'Kendine yumuşak, hedefe kararlı ol.',
+    'Küçük bir iyilikle güne iz bırak.',
+    'Bugün “yeterince iyi” ilerleme günü.',
+    'Zihnini sadeleştir, yapman gereken tek adıma dön.',
+    'Cesaret, küçük bir adımın içinde saklı.',
+    'Şimdi başlamak için en iyi an.'
+  ];
+  List<String> focusTr = [
+    '15 dakikalık tek odak bloğu planla.',
+    'Bildirimleri 20 dakika kapat.',
+    'Bir kişiye nazik bir mesaj gönder.',
+    'Su iç, omuzlarını gevşet, toparlan.',
+    'Bugün tek net sonuç: 1 küçük tamam.',
+    '“Sonraki adım”ını yaz ve uygula.',
+    'Biriken işi mikroadıma böl ve başla.',
+    'Kendine bir cümlelik destek yaz.',
+    'Pencereyi aç, 3 derin nefes al.',
+    'Günün sonunda 3 cümlelik not bırak.'
+  ];
+  List<String> closeTr = [
+    'Unutma, ilerleme kusursuzluktan güçlüdür.',
+    'Günün armağanı: sakin bir zihin.',
+    'Küçük ama istikrarlı kazanımlar kalıcıdır.',
+    'Hafifçe başla, net bitir.',
+    'Bugün kendine şefkat göstermeyi seç.',
+    'Büyük resim küçük adımlarla çizilir.',
+    'Zaman, niyete eşlik edince derinleşir.',
+    'Yol, yürüdükçe aydınlanır.',
+    'Yavaşlıkla değil, vazgeçmekle kaybedilir.',
+    'Sen başlarsan evren eşlik eder.'
+  ];
+
+  // English (minimal, fallback)
+  List<String> introEn = [
+    'Set your rhythm with small steps today.',
+    'Clarify your intention in one sentence.',
+    'If your mind is crowded, start with breath.',
+    'Where focus goes, energy grows.',
+    'Be gentle to yourself, firm to your goal.',
+  ];
+  List<String> focusEn = [
+    'Plan a single 15-minute focus block.',
+    'Silence notifications for 20 minutes.',
+    'Send a kind message to one person.',
+    'Drink water, relax your shoulders, reset.',
+    'Write and do your next tiny step.',
+  ];
+  List<String> closeEn = [
+    'Progress beats perfection.',
+    'A calm mind is today’s gift.',
+    'Small steady wins stick.',
+    'Start light, finish clear.',
+    'When you begin, life joins.',
+  ];
+
+  Map<String, List<List<String>>> bank = {
+    'tr': [introTr, focusTr, closeTr],
+    'en': [introEn, focusEn, closeEn],
+    'es': [introEn, focusEn, closeEn],
+    'ar': [introEn, focusEn, closeEn],
+  };
+
+  final lists = bank[lang] ?? bank['en']!;
+  // Single-sentence per-user, per-day message
+  {
+    final pool = <String>[...lists[0], ...lists[1], ...lists[2]];
+    if (pool.isNotEmpty) {
+      final idx = (seed % pool.length).abs();
+      final z = zodiac.isNotEmpty ? ' (${zodiac})' : '';
+      final header = {
+        'tr': '$you$z,',
+        'es': '$you$z,',
+        'ar': '$you$z',
+        'en': '$you$z,',
+      }[lang] ?? '$you$z,';
+      return header + ' ' + pool[idx];
+    }
+  }
+  int pick(int mod, int offset) => (seed + offset) % mod;
+  final i1 = lists[0][pick(lists[0].length, 17)];
+  final i2 = lists[1][pick(lists[1].length, 53)];
+  final i3 = lists[2][pick(lists[2].length, 91)];
+
+  final z = zodiac.isNotEmpty ? ' (${zodiac})' : '';
+  final header = {
+    'tr': '$you$z,',
+    'es': '$you$z,',
+    'ar': '$you$z،',
+    'en': '$you$z,',
+  }[lang] ?? '$you$z,';
+
+  return [header, '', i1, i2, i3].join('\n');
+}

@@ -4,15 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'features/splash/splash_page.dart';
 import 'core/i18n/app_localizations.dart';
 import 'features/onboarding/onboarding_page.dart';
-import 'features/auth/auth_page.dart';
-import 'features/auth/verify_page.dart';
+import 'features/auth/signin_page.dart';
 import 'features/auth/signup_page.dart';
 import 'features/home/home_shell.dart';
 import 'features/premium/paywall_page.dart';
 import 'features/readings/coffee/coffee_page_fixed.dart';
 import 'features/readings/tarot/tarot_page.dart';
 import 'features/readings/palm/palm_page.dart';
-import 'features/readings/common/reading_result_page_fixed.dart';
+import 'features/readings/common/reading_result_page2.dart';
 import 'features/history/history_entry.dart';
 import 'features/settings/settings_page.dart';
 import 'features/notifications/notification_center_page.dart';
@@ -27,9 +26,8 @@ final appRouter = GoRouter(
   routes: [
     GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
     GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
-    GoRoute(path: '/auth', builder: (_, __) => const AuthPage()),
+    GoRoute(path: '/auth', builder: (_, __) => const SignInPage()),
     GoRoute(path: '/auth/signup', builder: (_, __) => const SignUpPage()),
-    GoRoute(path: '/auth/verify', builder: (_, __) => const VerifyPage()),
     GoRoute(path: '/home', builder: (_, __) => const HomeShell()),
     GoRoute(path: '/live', builder: (_, __) => const HomeShell(initialIndex: 1)),
     GoRoute(path: '/paywall', builder: (_, __) => const PaywallPage()),

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import '../lib/core/i18n/app_localizations.dart';
 import '../lib/core/entitlements/entitlements_controller.dart';
-import '../lib/features/readings/common/reading_result_page_fixed.dart';
+import '../lib/features/readings/common/reading_result_page2.dart';
 
 void main() {
   Widget _wrap(Widget child, {Locale? locale, int energy = 70}) {
@@ -58,4 +58,3 @@ void main() {
     expect(result!.toLowerCase(), anyOf(contains('high energy'), contains('bold')));
   });
 }
-

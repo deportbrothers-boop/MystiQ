@@ -1,13 +1,15 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
-import '../../../core/ai/local_generator.dart';
 import '../../../core/ai/ai_service.dart';
+
 import '../../profile/profile_controller.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/ads/rewarded_helper.dart';
@@ -35,6 +37,9 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
   bool _streaming = false;
   bool _cancelled = false;
   Timer? _streamGuard;
+  // Throttle UI updates during streaming to avoid jank/ANR
+  Timer? _uiUpdateDebounce;
+  String _lastChunk = '';
   // Countdown for scheduled readiness (e.g., tarot 10/5 dk)
   Timer? _countdown;
   DateTime? _readyAt;
@@ -75,22 +80,15 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Localizations/AppLocalizations.of(context) should not be used in initState.
-    // Normalize any providedText here when context is ready.
-    if (!_didNormalizeProvided && widget.providedText != null && text.isNotEmpty) {
-      try {
-        if (text.trim().length < 1200) {
-          text = _ensureMinLength(context, widget.type, text);
-        }
-      } catch (_) {}
-      _didNormalizeProvided = true;
-    }
+    // Preserve provided text exactly as saved in history; no post-processing.
+    _didNormalizeProvided = true;
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     _streamGuard?.cancel();
+    _uiUpdateDebounce?.cancel();
     _countdown?.cancel();
     super.dispose();
   }
@@ -160,65 +158,76 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     try {
       final profile = context.read<ProfileController>().profile;
       final locale = Localizations.localeOf(context).languageCode;
+      final hcEarly = context.read<HistoryController>();
+      final titleEarly = titleTr(context, widget.type);
       final extras = Map<String, dynamic>.from(widget.requestExtras ?? {});
-      final ent = context.read<EntitlementsController>();
-      final isPremium = ent.isPremium;
-      extras['premium'] = isPremium;
-      extras['length'] = isPremium ? 'long' : 'medium';
-      extras['i18n'] = _premiumI18n(context);
-      extras['energy'] = ent.energy;
-      final forceLocal = extras['forceLocal'] == true;
-      var generated = '';
-      if (!forceLocal) {
-        generated = await AiService.generate(
-          type: widget.type,
-          profile: profile,
-          extras: extras,
-          locale: locale,
-        );
-      } else {
-        generated = LocalAIGenerator.generate(
-          type: widget.type,
-          profile: profile,
-          extras: extras,
-          locale: locale,
-        );
+      // Do not add any client-side shaping hints; leave content fully to AI.
+
+      var generated = await AiService.generate(
+        type: widget.type,
+        profile: profile,
+        extras: extras,
+        locale: locale,
+      );
+
+      // Keep AI response as-is (no headers/outros/min-length padding).
+      if (!mounted) {
+        // Page was closed; still persist to history so coin reads appear
+        try {
+          final usedId = _pendingId ?? DateTime.now().millisecondsSinceEpoch.toString();
+          final entry = HistoryEntry(
+            id: usedId,
+            type: widget.type,
+            title: titleEarly,
+            text: generated,
+            createdAt: DateTime.now(),
+          );
+          try {
+            try { try { await hcEarly.upsert(entry); } catch (_) { await _saveHistoryDirect(entry); } } catch (_) { await _saveHistoryDirect(entry); }
+          } catch (_) {
+            await _saveHistoryDirect(entry);
+          }
+        } catch (_) {}
+        return;
       }
-      generated = _withDailyHeader(context, widget.type, generated);
-      generated = _appendPersonalOutro(widget.type, locale, profile.name, generated);
-      if (generated.trim().length < 1600) {
-        generated = _ensureMinLength(context, widget.type, generated);
-      }
-      if (!mounted) return;
       setState(() { text = generated; _streaming = false; });
       await _saveToHistory();
+      // Show info when there is no countdown (e.g., coin flows)
+      if (((_remainingSeconds ?? 0) == 0) && !_doneSnackShown && mounted) {
+        _doneSnackShown = true;
+        final loc = AppLocalizations.of(context);
+        final msg = loc.t('reading.countdown.done') != 'reading.countdown.done'
+            ? loc.t('reading.countdown.done')
+            : 'Faliniz gecmis kutusuna yonlendirilmistir.';
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        } catch (_) {}
+      }
+      // Saved: cancel pending to prevent re-generation overwriting this result
+      try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
+      _pendingId = null;
       await Analytics.log('reading_completed', {'type': widget.type});
     } catch (_) {
-      // Local fallback
-      final extras = Map<String, dynamic>.from(widget.requestExtras ?? {});
-      final ent = context.read<EntitlementsController>();
-      extras['premium'] = ent.isPremium;
-      extras['length'] = ent.isPremium ? 'long' : 'medium';
-      extras['i18n'] = _premiumI18n(context);
-      extras['energy'] = ent.energy;
-      var generated = LocalAIGenerator.generate(
-        type: widget.type,
-        profile: context.read<ProfileController>().profile,
-        extras: extras,
-        locale: Localizations.localeOf(context).languageCode,
-      );
-      generated = _withDailyHeader(context, widget.type, generated);
-      generated = _appendPersonalOutro(widget.type, Localizations.localeOf(context).languageCode, context.read<ProfileController>().profile.name, generated);
-      if (generated.trim().length < 1600) {
-        generated = _ensureMinLength(context, widget.type, generated);
+      var generated = '�retim �u anda yap�lam�yor. L�tfen biraz sonra tekrar dene.';
+      if (!mounted) {
+        try {
+          final hcEarly = context.read<HistoryController>();
+          final usedId = _pendingId ?? DateTime.now().millisecondsSinceEpoch.toString();
+          final entry = HistoryEntry(
+            id: usedId,
+            type: widget.type,
+            title: _title(widget.type),
+            text: generated,
+            createdAt: DateTime.now(),
+          );
+          try { try { await hcEarly.upsert(entry); } catch (_) { await _saveHistoryDirect(entry); } } catch (_) { await _saveHistoryDirect(entry); }
+        } catch (_) {}
+        return;
       }
-      if (!mounted) return;
       setState(() { text = generated; _streaming = false; });
       await _saveToHistory();
     }
-  }
-
-  Future<void> _streamAndSave() async {
+  }Future<void> _streamAndSave() async {
     if (!mounted) return;
     final profile = context.read<ProfileController>().profile;
     final locale = Localizations.localeOf(context).languageCode;
@@ -228,12 +237,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       await _generateAndSave();
       return;
     }
-    final ent = context.read<EntitlementsController>();
-    final isPremium = ent.isPremium;
-    extras['premium'] = isPremium;
-    extras['length'] = isPremium ? 'long' : 'medium';
-    extras['i18n'] = _premiumI18n(context);
-    extras['energy'] = ent.energy;
+    // Do not include client-side shaping hints; raw AI stream only.
     _sub = AiService
         .streamGenerate(
             type: widget.type,
@@ -242,20 +246,39 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
             locale: locale)
         .listen((chunk) {
       if (!mounted || _cancelled) return;
-      setState(() => text = _withDailyHeader(context, widget.type, chunk));
+      _lastChunk = chunk;
+      if (_uiUpdateDebounce == null) {
+        _uiUpdateDebounce = Timer(const Duration(milliseconds: 120), () {
+          _uiUpdateDebounce = null;
+          if (!mounted || _cancelled) return;
+          final latest = _lastChunk;
+          setState(() => text = latest);
+        });
+      }
     }, onDone: () async {
       if (!mounted || _cancelled) return;
       _streamGuard?.cancel();
       _streaming = false;
-      // Append closing message once at end of stream
-      final profile = context.read<ProfileController>().profile;
-      final locale = Localizations.localeOf(context).languageCode;
-      text = _appendPersonalOutro(widget.type, locale, profile.name, text);
-      if (text.trim().length < 1600) {
-        text = _ensureMinLength(context, widget.type, text);
+      // Ensure final chunk is rendered
+      _uiUpdateDebounce?.cancel();
+      _uiUpdateDebounce = null;
+      if (_lastChunk.isNotEmpty) {
+        setState(() => text = _lastChunk);
       }
+      // No client-side closing additions; keep raw AI text.
       await _saveToHistory();
+      if (((_remainingSeconds ?? 0) == 0) && !_doneSnackShown && mounted) {
+        _doneSnackShown = true;
+        final loc = AppLocalizations.of(context);
+        final msg = loc.t('reading.countdown.done') != 'reading.countdown.done'
+            ? loc.t('reading.countdown.done')
+            : 'Faliniz gecmis kutusuna yonlendirilmistir.';
+        try { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))); } catch (_) {}
+      }
       await Analytics.log('reading_completed', {'type': widget.type, 'stream': true});
+      // Cancel any pending schedule to avoid a second generation overwriting
+      try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
+      _pendingId = null;
       setState(() {});
     }, onError: (_) async {
       if (!mounted) return;
@@ -274,6 +297,29 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         await _generateAndSave();
       }
     });
+  }
+
+  // Fallback writer when Provider is unavailable (e.g., page closed before saving)
+  Future<void> _saveHistoryDirect(HistoryEntry e) async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      const key = 'history_entries_v1';
+      final list = sp.getStringList(key) ?? <String>[];
+      int idx = -1;
+      for (var i = 0; i < list.length; i++) {
+        try {
+          final m = json.decode(list[i]) as Map<String, dynamic>;
+          if ((m['id'] as String?) == e.id) { idx = i; break; }
+        } catch (_) {}
+      }
+      final enc = json.encode(e.toJson());
+      if (idx >= 0) {
+        list[idx] = enc;
+      } else {
+        list.insert(0, enc);
+      }
+      await sp.setStringList(key, list);
+    } catch (_) {}
   }
 
   @override
@@ -340,7 +386,8 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
                     if (!ok || !mounted) return;
                     final now = DateTime.now();
                     final left = _remainingSeconds ?? 0;
-                    final reduce = left > 240 ? 300 : (left ~/ 2).clamp(60, left);
+                    final int reduce = (widget.type == 'tarot') ? (left >= 240 ? 240 : left) : (left > 240 ? 300 : ((left ~/ 2) < 60 ? 60 : (left ~/ 2)));
+
                     final newReady = now.add(Duration(seconds: left - reduce));
                     setState(() { _readyAt = newReady; _remainingSeconds = (left - reduce); _speedupUsed = true; });
                     // Update pending schedule if known
@@ -352,10 +399,10 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
                       }
                     } catch (_) {}
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(AppLocalizations.of(context).t('reading.speedup.thanks') != 'reading.speedup.thanks' ? AppLocalizations.of(context).t('reading.speedup.thanks') : 'Hızlandırıldı! Bekleme süresi kısaldı.')),
+                      SnackBar(content: Text(AppLocalizations.of(context).t('reading.speedup.thanks') != 'reading.speedup.thanks' ? AppLocalizations.of(context).t('reading.speedup.thanks') : 'H�zland�r�ld�! Bekleme s�resi k�sald�.')),
                     );
                   },
-                  label: Text(AppLocalizations.of(context).t('reading.speedup.button') != 'reading.speedup.button' ? AppLocalizations.of(context).t('reading.speedup.button') : 'Hızlandır (reklam)'),
+                  label: Text(AppLocalizations.of(context).t('reading.speedup.button') != 'reading.speedup.button' ? AppLocalizations.of(context).t('reading.speedup.button') : 'H�zland�r (reklam)'),
                 ),
             ],
           ),
@@ -365,11 +412,11 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         ],
         const SizedBox(height: 12),
         if (widget.type == 'tarot' && cardIdxs != null && cardIdxs.isNotEmpty)
-          _TarotResultRow(indices: cardIdxs)
-            else if (_streaming && text.isEmpty)
-              const _ShimmerParagraph()
-            else
-              Expanded(child: SingleChildScrollView(child: Text(text))),
+          _TarotResultRow(indices: cardIdxs),
+        if (_streaming && text.isEmpty)
+          const _ShimmerParagraph()
+        else
+          Expanded(child: SingleChildScrollView(child: Text(text))),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -414,14 +461,22 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
   Future<void> _saveToHistory() async {
     if (_saved) return;
     final hc = context.read<HistoryController>();
+    // If this page was opened via a scheduled/pending flow, reuse that ID so
+    // the placeholder entry is replaced (immutable final text afterwards).
+    final usedId = _pendingId ?? DateTime.now().millisecondsSinceEpoch.toString();
     final entry = HistoryEntry(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: usedId,
       type: widget.type,
       title: titleTr(context, widget.type),
       text: text,
       createdAt: DateTime.now(),
     );
-    await hc.add(entry);
+    // If we had a pending id, upsert to replace existing placeholder, else add
+    if (_pendingId != null) {
+      await hc.upsert(entry);
+    } else {
+      await hc.add(entry);
+    }
     _placeholderProvided = _looksLikePlaceholder(text);
     _saved = !_placeholderProvided;
     if (_placeholderProvided && (widget.requestExtras == null || (widget.requestExtras?.isEmpty ?? true))) {
@@ -434,7 +489,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     final s = t.toLowerCase().trim();
     if (s.isEmpty) return true;
     if (s.length < 24) return true;
-    return s.contains('hazir') || s.contains('hazır') || s.contains('prepar') || s.contains('loading');
+    return s.contains('hazir') || s.contains('haz�r') || s.contains('prepar') || s.contains('loading');
   }
 
 String _appendPersonalOutro(String type, String locale, String name, String base) {
@@ -478,7 +533,7 @@ String _appendPersonalOutro(String type, String locale, String name, String base
     return base.contains(add.trim()) ? base : (base.trim() + '\n\n' + add);
   }
   if (type == 'astro') {
-    final tr = '($who), bugun yildizlarin fısıltısını bir cumlelik niyetle tamamla;\n'
+    final tr = '($who), bugun yildizlarin f�s�lt�s�n� bir cumlelik niyetle tamamla;\n'
         'kucuk ama net adimlar acilir.\n\nGunun sonrasi icin MystiQ\'e bekleriz.';
     final en = '($who), close today\'s stars with one-line intention;\n'
         'small, clear steps open.\n\nSee you on MystiQ for the next one.';
@@ -582,120 +637,9 @@ String _withDailyHeader(BuildContext ctx, String type, String base) {
 }
 
 String _ensureMinLength(BuildContext ctx, String type, String base) {
-  final loc = AppLocalizations.of(ctx);
-  String t(String key, String fb) { final v = loc.t(key); return (v == key) ? fb : v; }
-  final ent = ctx.read<EntitlementsController>();
-  final energy = ent.energy;
-  String level;
-  if (energy < 50) {
-    level = 'low';
-  } else if (energy < 80) {
-    level = 'med';
-  } else {
-    level = 'high';
-  }
-  final sep = t('deep.sep', '---');
-  final hint = () {
-    final kType = 'energy.' + type + '.' + level;
-    final kGen = 'energy.generic.' + level;
-    final tv = loc.t(kType);
-    if (tv != kType) return tv;
-    final gv = loc.t(kGen);
-        if (gv != kGen) return gv;
-    if (Localizations.localeOf(ctx).languageCode == 'tr') {
-      switch (level) {
-        case 'low': return 'Nazik ilerle; bir nefes ve tek niyet.';
-        case 'med': return '15-20 dk tek odak iyi gelir.';
-        default: return 'Bir cesur adim ekle; net bir hedef koy.';
-      }
-    } else {
-      switch (level) {
-        case 'low': return 'Keep it gentle; one breath and one intention.';
-        case 'med': return '15-20 min of single-focus works well.';
-        default: return 'Add a bold step; set a clear target.';
-      }
-    }
-  }();
-  final lines = <String>[base.trim(), '', sep, hint];
-  // Add deeper guidance if still short
-  if ((lines.join('\n')).length < 900) {
-    final extras = <String>[];
-    String pick(String k, String fb) { final v = loc.t(k); return v == k ? fb : v; }
-    switch (type) {
-      case 'tarot':
-        extras.addAll([
-          pick('deep.tarot.p1', '1) Odak: kart mesajini tek cumle ile not et.'),
-          pick('deep.tarot.p2', '2) Iletisim: bugun nazik ve net bir sozcuk sec.'),
-          pick('deep.tarot.p3', '3) Kapanis: aksama tek cumle geri bakis yaz.'),
-          '4) Eylem: Bugun 20 dakikalik tek-odak zamanini ayir.',
-          '5) Iliski: Bir kisiye icten bir tesekkur yolla.',
-        ]);
-        break;
-      case 'coffee':
-        extras.addAll([
-          pick('deep.coffee.p1', 'Desenleri birlestir; tekrar eden izlere bak.'),
-          'Kokuyu, sicakligi ve kenar izlerini birlikte yorumla.',
-          'Gunun kalaninda kucuk bir niyet cumlesi yaz ve sakla.',
-        ]);
-        break;
-      case 'palm':
-        extras.addAll([
-          pick('deep.palm.p1', 'Kalp ve bas cizgisini ayri ayri yorumla.'),
-          'Basparmak iradeyi simgeler; gunluk ufak bir karari netlestir.',
-          'Yaz: duygu/akil dengesine 3 cumle ayir.',
-        ]);
-        break;
-      case 'dream':
-        extras.addAll([
-          pick('deep.dream.p1', 'Sembolunu gun icinde 3 kez fark et; not al.'),
-          'Duyguyu tek kelimeyle adlandir ve 2 ornek topla.',
-          'Aksam, ruyanin sana soyledigi bir minik adimi yaz.',
-        ]);
-        break;
-      case 'astro':
-        extras.addAll([
-          'Gunun ritmi: 15-20 dk tek-odak + kisacik mola dongusu dene.',
-          'Iletisimde netlik: bir cumlelik nezaket ve net istek yaz.',
-          'Aksam: 3 cumlelik kapanis: ne ogrendin, neyi biraktin?',
-        ]);
-        break;
-      default:
-        break;
-    }
-    if (extras.isNotEmpty) {
-      lines.add('');
-      for (final e in extras) { if (e.trim().isNotEmpty) lines.add('- ' + e); }
-    }
-  }
-  // If still short, add practical microÃ¢â‚¬â€˜steps until target length
-  final targetLen = (type == 'astro') ? 2200 : 1800;
-  if ((lines.join('\n')).length < targetLen) {
-    final isTr = Localizations.localeOf(ctx).languageCode == 'tr';
-final pads = isTr ? <String>[
-  'Mikro-adim: 3 derin nefes + tek cumle niyet.',
-  'Odak: 15-20 dk tek odak, sonra 3 dk mola.',
-  'Iletisim: birine nazik ve net bir mesaj gonder.',
-  'Kapanis: aksam uc cumle ile gunu tamamla.',
-  'Beden: bir bardak su ic ve 5 dk yuru.',
-  'Zihin: ertelediginden birini bugun kapat.',
-] : <String>[
-  'Micro-step: 3 deep breaths + one-sentence intention.',
-  'Focus: 15-20 min single-focus, then a 3-min break.',
-  'Communication: send one kind, clear message.',
-  'Closure: end the day in three sentences.',
-  'Body: drink water and take a 5-min walk.',
-  'Mind: close one postponed item today.',
-];
-    var k = 0;
-    while ((lines.join('\n')).length < targetLen && k < 24) {
-      lines.add('- ' + pads[k % pads.length]);
-      k++;
-    }
-  }
-  return lines.join('\n');
+  return base.trim();
 }
 
-// Test helper wrapper (public) to allow unit tests to call _ensureMinLength
 String ensureMinLengthForTest(BuildContext ctx, String type, String base) =>
     _ensureMinLength(ctx, type, base);
 
@@ -821,7 +765,7 @@ class _DoneInfoBanner extends StatelessWidget {
     final loc = AppLocalizations.of(context);
     final text = loc.t('reading.countdown.done') != 'reading.countdown.done'
         ? loc.t('reading.countdown.done')
-        : 'FalÄ±nÄ±z geÃ§miÅŸ kutusuna yÃ¶nlendirilmiÅŸtir.';
+        : 'Falınız geçmiş kutusuna yönlendirilmiştir.';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -872,5 +816,19 @@ class _DoneInfoBannerGold extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

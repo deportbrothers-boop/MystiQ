@@ -4,12 +4,13 @@ import '../history/history_page.dart';
 import '../profile/profile_page.dart';
 import 'package:provider/provider.dart';
 import '../../core/entitlements/entitlements_controller.dart';
-import '../../core/readings/pending_readings_service.dart';
+import '../../core/readings/pending_readings_service_fixed.dart';
 import '../profile/profile_controller.dart';
 import '../history/history_controller.dart';
 import '../../core/ads/ad_service.dart';
 import '../../core/i18n/app_localizations.dart';
 import '../live/live_chat_page_fixed.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeShell extends StatefulWidget {
   final int initialIndex;
@@ -33,6 +34,18 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         final prof = context.read<ProfileController>();
         final locale = Localizations.localeOf(context).languageCode;
         await PendingReadingsService.checkAndCompleteDue(history: hist, profile: prof, locale: locale);
+      } catch (_) {}
+      // Show signup success once
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final just = prefs.getBool('just_signed_up') ?? false;
+        if (just && mounted) {
+          final createdText = AppLocalizations.of(context).t('account.created') != 'account.created'
+              ? AppLocalizations.of(context).t('account.created')
+              : 'Hesabiniz olusturulmustur.';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(createdText)));
+          await prefs.setBool('just_signed_up', false);
+        }
       } catch (_) {}
     });
   }
@@ -109,9 +122,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               currentIndex: index,
               onTap: (i) {
                 if (i == 1) {
-                  // Keep the tab visible but disable navigation for now
-                  final msg = loc.t('common.coming_soon');
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                  final msg = (AppLocalizations.of(context).t('common.coming_soon') != 'common.coming_soon')
+                      ? AppLocalizations.of(context).t('common.coming_soon')
+                      : 'Yakinda';
+                  try { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))); } catch (_) {}
                   return;
                 }
                 setState(() => index = i);
@@ -123,7 +137,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 ),
                 BottomNavigationBarItem(
                   icon: _BarIcon(icon: Icons.chat_bubble_outline, active: index == 1, color: gold, inactive: unSel),
-                  label: navLive,
+                  label: (Localizations.localeOf(context).languageCode.startsWith('tr') ? 'Canli' : 'Live'),
                 ),
                 BottomNavigationBarItem(
                   icon: _BarIcon(icon: Icons.history, active: index == 2, color: gold, inactive: unSel),

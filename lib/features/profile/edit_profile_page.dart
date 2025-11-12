@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'user_profile.dart';
 import '../../core/i18n/app_localizations.dart';
 import 'profile_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -20,6 +21,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String marital = '';
   bool _saving = false;
   String? photoPath;
+  String? _error;
 
   @override
   void initState() {
@@ -30,15 +32,35 @@ class _EditProfilePageState extends State<EditProfilePage> {
     gender = p.gender;
     marital = p.marital;
     photoPath = p.photoPath;
+    // Show account created info if we just arrived from signup
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final just = prefs.getBool('just_signed_up') ?? false;
+        if (just && mounted) {
+          final createdText = AppLocalizations.of(context).t('account.created') != 'account.created'
+              ? AppLocalizations.of(context).t('account.created')
+              : 'Hesabiniz olusturulmustur.';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(createdText)));
+          await prefs.setBool('just_signed_up', false);
+        }
+      } catch (_) {}
+    });
   }
 
   ImageProvider? _avatarProvider() {
-    if (photoPath == null || photoPath!.isEmpty) return null;
-    try {
-      return FileImage(File(photoPath!));
-    } catch (_) {
-      return null;
+    // Prefer newly picked local file
+    if (photoPath != null && photoPath!.isNotEmpty) {
+      try { return FileImage(File(photoPath!)); } catch (_) {}
     }
+    // Else fall back to remote photoUrl from profile for cross-device sync
+    try {
+      final url = context.read<ProfileController>().profile.photoUrl;
+      if (url != null && url.isNotEmpty) {
+        return NetworkImage(url);
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override
@@ -107,6 +129,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           TextField(
             controller: nameCtrl,
             decoration: InputDecoration(labelText: AppLocalizations.of(context).t('profile.edit.name_label')),
+            onChanged: (_) => setState(() { _error = null; }),
           ),
           const SizedBox(height: 12),
           ListTile(
@@ -121,7 +144,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 firstDate: DateTime(1900),
                 lastDate: now,
               );
-              if (picked != null) setState(() => birth = picked);
+              if (picked != null) setState(() { birth = picked; _error = null; });
             },
           ),
           const SizedBox(height: 12),
@@ -148,10 +171,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
             decoration: InputDecoration(labelText: AppLocalizations.of(context).t('profile.marital.label')),
           ),
           const SizedBox(height: 24),
+          if (_error != null) ...[
+            Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+            const SizedBox(height: 8),
+          ],
           ElevatedButton(
             onPressed: _saving
                 ? null
                 : () async {
+                    final nameOk = nameCtrl.text.trim().isNotEmpty;
+                    final birthOk = birth != null;
+                    if (!nameOk || !birthOk) {
+                      setState(() => _error = 'Lutfen ad ve dogum tarihini doldurun.');
+                      return;
+                    }
                     setState(() => _saving = true);
                     final p = UserProfile(
                       name: nameCtrl.text.trim(),

@@ -1,27 +1,28 @@
-{
-  "help.faq": "SSS",
-  "help.faq.title": "Sık Sorulan Sorular",
-  "help.feedback": "Geri Bildirim",
-
-  "settings.language": "Dil",
-  "lang.tr": "Türkçe",
-
-  "profile.premium": "Premium",
-  "premium.inactive": "Premium aktif değil",
-  "profile.test.add_10000_button": "+10.000 enerji",
-
-  "rewards.daily.button": "Günlük ödül",
-  "rewards.weekly.button": "Haftalık ödül",
-
-  "legal.terms_short": "Kullanım koşulları",
-  "legal.privacy_short": "Gizlilik",
-
-  "coffee.cta": "Fal Bak",
-  "coffee.entry.title": "Devam etmeyi seçin",
-  "coffee.entry.watch_and_read": "Reklam izle, Fal Bak",
-  "coffee.entry.coin": "Coin ile Fal Bak",
-  "coffee.entry.ad_ok": "Reklam izlendi. Sonuç yaklaşık 10 dk içinde hazır. Hızlandırmak için sonuç ekranında reklam izleyebilirsiniz.",
-
-  "reading.speedup.button": "Hızlandır (reklam)",
-  "reading.speedup.thanks": "Hızlandırıldı! Bekleme süresi kısaldı."
+﻿{
+    "help.faq":  "SSS",
+    "help.faq.title":  "SÄ±k Sorulan Sorular",
+    "help.feedback":  "Geri Bildirim",
+    "settings.language":  "Dil",
+    "lang.tr":  "TÃ¼rkÃ§e",
+    "profile.premium":  "Premium",
+    "premium.inactive":  "Premium aktif deÄŸil",
+    "profile.test.add_10000_button":  "+10.000 enerji",
+    "rewards.daily.button":  "GÃ¼nlÃ¼k Ã¶dÃ¼l",
+    "rewards.weekly.button":  "HaftalÄ±k Ã¶dÃ¼l",
+    "legal.terms_short":  "KullanÄ±m koÅŸullarÄ±",
+    "legal.privacy_short":  "Gizlilik",
+    "coffee.cta":  "Fal Bak",
+    "coffee.entry.title":  "Devam etmeyi seÃ§in",
+    "coffee.entry.watch_and_read":  "Reklam izle, Fal Bak",
+    "coffee.entry.coin":  "Coin ile Fal Bak",
+    "coffee.entry.ad_ok":  "Reklam izlendi. SonuÃ§ yaklaÅŸÄ±k 10 dk iÃ§inde hazÄ±r. HÄ±zlandÄ±rmak iÃ§in sonuÃ§ ekranÄ±nda reklam izleyebilirsiniz.",
+    "reading.speedup.button":  "HÄ±zlandÄ±r (reklam)",
+    "reading.speedup.thanks":  "HÄ±zlandÄ±rÄ±ldÄ±! Bekleme sÃ¼resi kÄ±saldÄ±.",
+    "settings.title":  "Ayarlar",
+    "settings.fcm.reset_title":  "Bildirimleri sıfırla",
+    "settings.fcm.reset_sub":  "Teslimat bozulduysa kaydı yenileyin.",
+    "lang.system":  "Sistem dili",
+    "lang.en":  "İngilizce",
+    "lang.es":  "İspanyolca",
+    "lang.ar":  "Arapça"
 }

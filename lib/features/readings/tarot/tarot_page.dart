@@ -1,4 +1,4 @@
-﻿// import 'dart:math' as math; // unused
+// import 'dart:math' as math; // unused
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/access/access_gate.dart';
@@ -10,7 +10,7 @@ import '../../../common/widgets/sharp_image.dart';
 import 'package:provider/provider.dart';
 import '../../../core/entitlements/entitlements_controller.dart';
 import '../../../core/i18n/app_localizations.dart';
-import '../../../core/readings/pending_readings_service.dart';
+import '../../../core/readings/pending_readings_service_fixed.dart';
 import 'tarot_deck_fixed.dart';
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
@@ -55,11 +55,199 @@ class _TarotPageState extends State<TarotPage> {
           'etaSeconds': readyAt.difference(DateTime.now()).inSeconds.clamp(0, 86400),
           'readyAt': readyAt.toIso8601String(),
           'generateAtReady': true,
-          'noStream': true,
-          'forceLocal': true,
+          // streaming/local flags removed
         });
       } catch (_) {}
     });
+  }
+
+  Widget _buildBottomCtas() {
+    final loc = AppLocalizations.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          children: [
+            Text("${loc.t('tarot.selected_prefix')} ${selected.length}/3"),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: selected.length < 3 ? null : () async {
+                    await Analytics.log('reading_started', {'type': 'tarot_ad'});
+                    final ok = await RewardedAds.show(context: context);
+                    if (!context.mounted) return;
+                    if (!ok) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(
+                          AppLocalizations.of(context).t('tarot.fast.ad_failed') != 'tarot.fast.ad_failed'
+                              ? AppLocalizations.of(context).t('tarot.fast.ad_failed')
+                              : 'Reklam gösterilemedi. Tekrar deneyin.',
+                        )),
+                      );
+                      return;
+                    }
+                    try { await RewardedAds.recordOne(); } catch (_) {}
+                    final idxs = _slots.whereType<int>().toList();
+                    final names = idxs.map(TarotDeck.nameForIndex).toList();
+                    final nowMs = DateTime.now().millisecondsSinceEpoch;
+                    final reversed = List<bool>.generate(idxs.length, (k) => ((nowMs + k + idxs[k]) % 2) == 0);
+                    final eta = const Duration(minutes: 8);
+                    final readyAt = DateTime.now().add(eta);
+                    String? scheduledId;
+                    try {
+                      final extras = <String, dynamic>{
+                        'cards': names,
+                        'cardIndices': idxs,
+                        'reversed': reversed,
+                        'topic': _topic,
+                        'style': _style,
+                        'adBoost': true,
+                      };
+                      final locale = Localizations.localeOf(context).languageCode;
+                      scheduledId = await PendingReadingsService.schedule(
+                        type: 'tarot',
+                        readyAt: readyAt,
+                        extras: extras,
+                        locale: locale,
+                      );
+                      try {
+                        final hc = context.read<HistoryController>();
+                        await hc.upsert(HistoryEntry(
+                          id: scheduledId!,
+                          type: 'tarot',
+                          title: AppLocalizations.of(context).t('tarot.title'),
+                          text: AppLocalizations.of(context).t('reading.preparing'),
+                          createdAt: DateTime.now(),
+                        ));
+                      } catch (_) {}
+                    } catch (_) {}
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(
+                        AppLocalizations.of(context).t('tarot.fast.thanks') != 'tarot.fast.thanks'
+                            ? AppLocalizations.of(context).t('tarot.fast.thanks')
+                            : 'Teşekkürler! Falın 8 dk içinde hazır olacak.',
+                      )),
+                    );
+                    context.push('/reading/result/tarot', extra: {
+                      'cards': names,
+                      'cardIndices': idxs,
+                      'reversed': reversed,
+                      'sessionId': DateTime.now().millisecondsSinceEpoch,
+                      'etaSeconds': eta.inSeconds,
+                      'readyAt': readyAt.toIso8601String(),
+                      'generateAtReady': true,
+                      if (scheduledId != null) 'pendingId': scheduledId,
+                      'topic': _topic,
+                      'style': _style,
+                      // streaming/local flags removed
+                    });
+                  },
+                  icon: const Icon(Icons.play_circle_outline, size: 18),
+                  label: Text(
+                    AppLocalizations.of(context).t('tarot.entry.watch_and_read') != 'tarot.entry.watch_and_read'
+                        ? AppLocalizations.of(context).t('tarot.entry.watch_and_read')
+                        : 'Reklam izle (8 dk)',
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: selected.length < 3 ? null : () async {
+                      await Analytics.log('reading_started', {'type': 'tarot'});
+                      final ent = context.read<EntitlementsController>();
+                      final confirmed = await showModalBottomSheet<bool>(
+                        context: context,
+                        showDragHandle: true,
+                        backgroundColor: const Color(0xFF121018),
+                        builder: (_) => SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(AppLocalizations.of(context).t('coins.confirm.title') != 'coins.confirm.title'
+                                    ? AppLocalizations.of(context).t('coins.confirm.title')
+                                    : 'Coin harcanacak'),
+                                const SizedBox(height: 8),
+                                Text(AppLocalizations.of(context).t('coins.confirm.body') != 'coins.confirm.body'
+                                    ? AppLocalizations.of(context).t('coins.confirm.body')
+                                    : 'Bu tarot falı için ${SkuCosts.tarotDeep} coin harcanacak. Bakiyeniz: ${ent.coins}'),
+                                const SizedBox(height: 12),
+                                Row(children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: Text(AppLocalizations.of(context).t('action.cancel')),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      child: Text(AppLocalizations.of(context).t('coins.confirm.spend') != 'coins.confirm.spend'
+                                          ? AppLocalizations.of(context).t('coins.confirm.spend')
+                                          : 'Harca (${SkuCosts.tarotDeep})'),
+                                    ),
+                                  ),
+                                ])
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                      if (!context.mounted) return;
+                      if (confirmed != true) return;
+                      final ok = await AccessGate.ensureCoinsOnlyOrPaywall(
+                        context,
+                        coinCost: SkuCosts.tarotDeep,
+                      );
+                      if (!ok) return;
+                      if (!context.mounted) return;
+                      final idxs = _slots.whereType<int>().toList();
+                      final names = idxs.map(TarotDeck.nameForIndex).toList();
+                      final nowMs = DateTime.now().millisecondsSinceEpoch;
+                      final reversed = List<bool>.generate(idxs.length, (k) => ((nowMs + k + idxs[k]) % 2) == 0);
+
+                      // Coins flow: no waiting, generate immediately (no placeholder in History)
+                      if (!context.mounted) return;
+                      context.push('/reading/result/tarot', extra: {
+                        'cards': names,
+                        'cardIndices': idxs,
+                        'reversed': reversed,
+                        'topic': _topic,
+                        'style': _style,
+                        // streaming/local flags removed
+                      });
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(loc.t('tarot.cta')),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.monetization_on_outlined, size: 16),
+                        const SizedBox(width: 2),
+                        Text('${SkuCosts.tarotDeep}'),
+                        const SizedBox(width: 6),
+                        Tooltip(
+                          message: (AppLocalizations.of(context).t('coins.reason.tarot') != 'coins.reason.tarot')
+                              ? AppLocalizations.of(context).t('coins.reason.tarot')
+                              : 'AI isleme maliyetleri nedeniyle coin gereklidir.',
+                          child: const Icon(Icons.info_outline, size: 16),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _placeIntoSlot(int index, {int? slot}) {
@@ -136,10 +324,10 @@ class _TarotPageState extends State<TarotPage> {
                   children: ['general','love','work','money','health'].map((k) {
                     String label;
                     switch (k) {
-                      case 'love': label = AppLocalizations.of(context).t('coffee.topic.love') != 'coffee.topic.love' ? AppLocalizations.of(context).t('coffee.topic.love') : 'AÅŸk'; break;
-                      case 'work': label = AppLocalizations.of(context).t('coffee.topic.work') != 'coffee.topic.work' ? AppLocalizations.of(context).t('coffee.topic.work') : 'Ä°ÅŸ'; break;
+                      case 'love': label = AppLocalizations.of(context).t('coffee.topic.love') != 'coffee.topic.love' ? AppLocalizations.of(context).t('coffee.topic.love') : 'Aşk'; break;
+                      case 'work': label = AppLocalizations.of(context).t('coffee.topic.work') != 'coffee.topic.work' ? AppLocalizations.of(context).t('coffee.topic.work') : 'İş'; break;
                       case 'money': label = AppLocalizations.of(context).t('coffee.topic.money') != 'coffee.topic.money' ? AppLocalizations.of(context).t('coffee.topic.money') : 'Para'; break;
-                      case 'health': label = AppLocalizations.of(context).t('coffee.topic.health') != 'coffee.topic.health' ? AppLocalizations.of(context).t('coffee.topic.health') : 'SaÄŸlÄ±k'; break;
+                      case 'health': label = AppLocalizations.of(context).t('coffee.topic.health') != 'coffee.topic.health' ? AppLocalizations.of(context).t('coffee.topic.health') : 'Sağlık'; break;
                       default: label = AppLocalizations.of(context).t('coffee.topic.general') != 'coffee.topic.general' ? AppLocalizations.of(context).t('coffee.topic.general') : 'Genel';
                     }
                     return ChoiceChip(
@@ -244,6 +432,8 @@ class _TarotPageState extends State<TarotPage> {
           ),
 
           // Bottom action
+          _buildBottomCtas(),
+          /*
           SafeArea(
             top: false,
             child: Padding(
@@ -252,7 +442,96 @@ class _TarotPageState extends State<TarotPage> {
                 children: [
                   Text("${loc.t('tarot.selected_prefix')} ${selected.length}/3"),
                   const SizedBox(height: 8),
-                  ElevatedButton(
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: selected.length < 3
+                            ? null
+                            : () async {
+                                await Analytics.log('reading_started', {'type': 'tarot_ad'});
+                                final ok = await RewardedAds.show(context: context);
+                                if (!context.mounted) return;
+                                if (!ok) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        AppLocalizations.of(context).t('tarot.fast.ad_failed') != 'tarot.fast.ad_failed'
+                                            ? AppLocalizations.of(context).t('tarot.fast.ad_failed')
+                                            : 'Reklam gösterilemedi. Tekrar deneyin.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                try { await RewardedAds.recordOne(); } catch (_) {}
+                                final idxs = _slots.whereType<int>().toList();
+                                final names = idxs.map(TarotDeck.nameForIndex).toList();
+                                final nowMs = DateTime.now().millisecondsSinceEpoch;
+                                final reversed = List<bool>.generate(idxs.length, (k) => ((nowMs + k + idxs[k]) % 2) == 0);
+                                final eta = const Duration(minutes: 8);
+                                final readyAt = DateTime.now().add(eta);
+                                String? scheduledId;
+                                try {
+                                  final extras = <String, dynamic>{
+                                    'cards': names,
+                                    'cardIndices': idxs,
+                                    'reversed': reversed,
+                                    'topic': _topic,
+                                    'style': _style,
+                                    'adBoost': true,
+                                  };
+                                  final locale = Localizations.localeOf(context).languageCode;
+                                  scheduledId = await PendingReadingsService.schedule(
+                                    type: 'tarot',
+                                    readyAt: readyAt,
+                                    extras: extras,
+                                    locale: locale,
+                                  );
+                                  try {
+                                    final hc = context.read<HistoryController>();
+                                    await hc.upsert(HistoryEntry(
+                                      id: scheduledId!,
+                                      type: 'tarot',
+                                      title: AppLocalizations.of(context).t('tarot.title'),
+                                      text: AppLocalizations.of(context).t('reading.preparing'),
+                                      createdAt: DateTime.now(),
+                                    ));
+                                  } catch (_) {}
+                                } catch (_) {}
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      AppLocalizations.of(context).t('tarot.fast.thanks') != 'tarot.fast.thanks'
+                                          ? AppLocalizations.of(context).t('tarot.fast.thanks')
+                                          : 'Teşekkürler! Falın 8 dk içinde hazır olacak.',
+                                    ),
+                                  ),
+                                );
+                                context.push('/reading/result/tarot', extra: {
+                                  'cards': names,
+                                  'cardIndices': idxs,
+                                  'reversed': reversed,
+                                  'sessionId': DateTime.now().millisecondsSinceEpoch,
+                                  'etaSeconds': eta.inSeconds,
+                                  'readyAt': readyAt.toIso8601String(),
+                                  'generateAtReady': true,
+                                  if (scheduledId != null) 'pendingId': scheduledId,
+                                  'topic': _topic,
+                                  'style': _style,
+                                  // streaming/local flags removed
+                                });
+                              },
+                        icon: const Icon(Icons.play_circle_outline, size: 18),
+                        label: Text(
+                          AppLocalizations.of(context).t('tarot.entry.watch_and_read') != 'tarot.entry.watch_and_read'
+                              ? AppLocalizations.of(context).t('tarot.entry.watch_and_read')
+                              : 'Reklam izle (8 dk)',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
                     onPressed: selected.length < 3
                         ? null
                         : () async {
@@ -277,7 +556,7 @@ class _TarotPageState extends State<TarotPage> {
                                       const SizedBox(height: 8),
                                       Text(AppLocalizations.of(context).t('coins.confirm.body') != 'coins.confirm.body'
                                           ? AppLocalizations.of(context).t('coins.confirm.body')
-                                          : 'Bu tarot falÄ± iÃ§in ${SkuCosts.tarotDeep} coin harcanacak. Bakiyeniz: ${ent.coins}'),
+                                          : 'Bu tarot falı için ${SkuCosts.tarotDeep} coin harcanacak. Bakiyeniz: ${ent.coins}'),
                                       const SizedBox(height: 12),
                                       Row(children: [
                                         Expanded(
@@ -313,8 +592,9 @@ class _TarotPageState extends State<TarotPage> {
                             if (!context.mounted) return;
 
                             // 3) Offer rewarded ad to reduce ETA 10 -> 5 minutes
-                            Duration eta = const Duration(minutes: 10);
+                            Duration eta = Duration.zero;
                             bool adUsed = false;
+                            if (eta > Duration.zero) {
                             try {
                               final choice = await showModalBottomSheet<String>(
                                 context: context,
@@ -330,14 +610,14 @@ class _TarotPageState extends State<TarotPage> {
                                         Text(
                                           AppLocalizations.of(context).t('tarot.fast.offer.title') != 'tarot.fast.offer.title'
                                               ? AppLocalizations.of(context).t('tarot.fast.offer.title')
-                                              : 'Daha hÄ±zlÄ± sonuÃ§ ister misiniz?',
+                                              : 'Daha hızlı sonuç ister misiniz?',
                                           style: const TextStyle(fontWeight: FontWeight.w700),
                                         ),
                                         const SizedBox(height: 6),
                                         Text(
                                           AppLocalizations.of(context).t('tarot.fast.offer.body') != 'tarot.fast.offer.body'
                                               ? AppLocalizations.of(context).t('tarot.fast.offer.body')
-                                              : 'Reklam izlerseniz tarot falÄ±nÄ±z 10 dk yerine 5 dk iÃ§inde hazÄ±r olur.',
+                                              : 'Reklam izlerseniz tarot falınız 10 dk yerine 5 dk içinde hazır olur.',
                                         ),
                                         const SizedBox(height: 14),
                                         Row(children: [
@@ -375,14 +655,14 @@ class _TarotPageState extends State<TarotPage> {
                                 if (!context.mounted) return;
                                 if (ok) {
                                   adUsed = true;
-                                  eta = const Duration(minutes: 5);
+                                  eta = const Duration(minutes: 8);
                                   try { await RewardedAds.recordOne(); } catch (_) {}
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text(
                                         AppLocalizations.of(context).t('tarot.fast.thanks') != 'tarot.fast.thanks'
                                             ? AppLocalizations.of(context).t('tarot.fast.thanks')
-                                            : 'TeÅŸekkÃ¼rler! FalÄ±n 5 dk iÃ§inde hazÄ±r olacak.'
+                                            : 'Teşekkürler! Falın 5 dk içinde hazır olacak.'
                                       )),
                                     );
                                   }
@@ -392,7 +672,7 @@ class _TarotPageState extends State<TarotPage> {
                                       SnackBar(content: Text(
                                         AppLocalizations.of(context).t('tarot.fast.ad_failed') != 'tarot.fast.ad_failed'
                                             ? AppLocalizations.of(context).t('tarot.fast.ad_failed')
-                                            : 'Reklam gÃ¶sterilemedi. Normal hÄ±zda devam ediliyor (10 dk).'
+                                            : 'Reklam gösterilemedi. Normal hızda devam ediliyor (10 dk).'
                                       )),
                                     );
                                   }
@@ -400,11 +680,25 @@ class _TarotPageState extends State<TarotPage> {
                               }
                             } catch (_) {}
 
-                            // 4) Schedule background completion + navigate to result (local) with countdown
+                            }
+                            // 4) If coins path (eta == 0), navigate immediately; else schedule background completion
                             final idxs = _slots.whereType<int>().toList();
                             final names = idxs.map(TarotDeck.nameForIndex).toList();
                             final nowMs = DateTime.now().millisecondsSinceEpoch;
                             final reversed = List<bool>.generate(idxs.length, (k) => ((nowMs + k + idxs[k]) % 2) == 0);
+                            if (eta == Duration.zero) {
+                              if (context.mounted) {
+                                context.push('/reading/result/tarot', extra: {
+                                  'cards': names,
+                                  'cardIndices': idxs,
+                                  'reversed': reversed,
+                                  'topic': _topic,
+                                  'style': _style,
+                                  // allow streaming for coin path (immediate)
+                                });
+                              }
+                              return;
+                            }
                             final readyAt = DateTime.now().add(eta);
                             String? scheduledId;
                             try {
@@ -447,8 +741,7 @@ class _TarotPageState extends State<TarotPage> {
                                 if (scheduledId != null) 'pendingId': scheduledId,
                                 'topic': _topic,
                                 'style': _style,
-                                'noStream': true,
-                                'forceLocal': true,
+                                // streaming/local flags removed
                               });
                             }
                           },
@@ -466,14 +759,17 @@ class _TarotPageState extends State<TarotPage> {
                               ? AppLocalizations.of(context).t('coins.reason.tarot')
                               : 'AI isleme maliyetleri nedeniyle coin gereklidir.',
                           child: const Icon(Icons.info_outline, size: 16),
-                        )
-                      ],
-                    )
+                         )
+                       ],
+                     ),
+                   ),
+                   ],
                   ),
                 ],
               ),
             ),
           ),
+          */
         ],
       ),
     );
@@ -549,6 +845,7 @@ class _SlotCard extends StatelessWidget {
     );
   }
 }
+
 
 
 

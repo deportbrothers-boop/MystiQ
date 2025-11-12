@@ -2,6 +2,7 @@
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../core/i18n/locale_controller.dart';
+import '../legal/legal_pages.dart';
 import '../../core/i18n/app_localizations.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -20,6 +21,16 @@ class SettingsPage extends StatelessWidget {
             title: Text(loc.t('settings.language')),
             subtitle: Text(_labelFor(current, loc)),
             onTap: () => _openLanguageSheet(context, current),
+          ),
+          const Divider(height: 24),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: Text(loc.t('legal.privacy_short')),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PrivacyPage()),
+              );
+            },
           ),
           const Divider(height: 24),
           ListTile(

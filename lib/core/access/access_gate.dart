@@ -12,12 +12,9 @@ class AccessGate {
   }) async {
     final ent = context.read<EntitlementsController>();
     final ok = await ent.tryConsumeForReading(coinCost: coinCost);
-    if (ok) {
-      return true;
-    }
-    if (context.mounted) {
-      _showPaywallSheet(context);
-    }
+    if (ok) return true;
+    // Production: block navigation and show paywall
+    _showPaywallSheet(context);
     return false;
   }
 
@@ -29,9 +26,8 @@ class AccessGate {
     final ent = context.read<EntitlementsController>();
     final ok = await ent.tryConsumeForReadingCoinsOnly(coinCost: coinCost);
     if (ok) return true;
-    if (context.mounted) {
-      _showPaywallSheet(context);
-    }
+    // Production: block navigation and show paywall
+    _showPaywallSheet(context);
     return false;
   }
 

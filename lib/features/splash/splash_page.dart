@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
 import '../../common/widgets/sharp_image.dart';
 import 'package:go_router/go_router.dart';
@@ -17,21 +19,38 @@ class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     super.initState();
-    // Navigate after first frame to avoid doing work during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Primary navigation after a very short display
-      Future.delayed(const Duration(milliseconds: 900), () {
-        if (!mounted || _navigated) return;
-        _navigated = true;
-        context.go('/onboarding');
-      });
-      // Safety fallback (if something blocks the first navigation)
-      Future.delayed(const Duration(milliseconds: 2500), () {
-        if (!mounted || _navigated) return;
-        _navigated = true;
+    // Decide target route based on remember-me and current auth state
+    WidgetsBinding.instance.addPostFrameCallback((_) => _decideRoute());
+  }
+
+  Future<void> _decideRoute() async {
+    try {
+      // small splash delay for visual consistency
+      await Future.delayed(const Duration(milliseconds: 600));
+      final prefs = await SharedPreferences.getInstance();
+      final remember = prefs.getBool('remember_me') ?? false;
+      User? user;
+      try {
+        user = FirebaseAuth.instance.currentUser;
+      } catch (_) {
+        user = null;
+      }
+      if (!remember && user != null) {
+        try { await FirebaseAuth.instance.signOut(); } catch (_) {}
+        user = null;
+      }
+      if (!mounted || _navigated) return;
+      _navigated = true;
+      if (remember && user != null) {
         context.go('/home');
-      });
-    });
+      } else {
+        context.go('/onboarding');
+      }
+    } catch (_) {
+      if (!mounted || _navigated) return;
+      _navigated = true;
+      context.go('/onboarding');
+    }
   }
 
   @override

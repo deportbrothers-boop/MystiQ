@@ -132,13 +132,10 @@ class _AuthPageState extends State<AuthPage> {
                 Text(_error!, style: const TextStyle(color: Colors.redAccent)),
                 const SizedBox(height: 8),
               ],
-              ElevatedButton(onPressed: _validEmail && _accepted ? _continueEmail : null, child: Text(loc.t('auth.email'))),
-              const SizedBox(height: 12),
-              OutlinedButton(onPressed: _accepted ? _continuePhone : null, child: Text(AppLocalizations.of(context).t('auth.phone'))),
-              const SizedBox(height: 12),
-              ElevatedButton(onPressed: _validEmail && _accepted ? _continueEmail : null, child: Text(loc.t('auth.google'))),
-              const SizedBox(height: 12),
-              ElevatedButton(onPressed: _validEmail && _accepted ? _continueEmail : null, child: Text(loc.t('auth.apple'))),
+              ElevatedButton(
+                onPressed: _validEmail && _accepted ? _continueEmail : null,
+                child: Text(loc.t('auth.email')),
+              ),
               const SizedBox(height: 24),
               Center(
                 child: TextButton(

@@ -1,6 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'user_profile.dart';
 
 class ProfileController with ChangeNotifier {
@@ -29,6 +33,32 @@ class ProfileController with ChangeNotifier {
     }
     chatTone = sp.getString(_kChatTone) ?? chatTone;
     chatLength = sp.getString(_kChatLength) ?? chatLength;
+
+    // Try to pull from Firestore for cross-device consistency
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final data = doc.data();
+        if (data != null) {
+          // Merge remote fields into local profile (remote wins if non-empty)
+          final remote = UserProfile.fromJson(data);
+          UserProfile merged = _profile;
+          if (remote.name.isNotEmpty) merged = merged.copyWith(name: remote.name);
+          if (remote.birthDate != null) merged = merged.copyWith(birthDate: remote.birthDate);
+          if (remote.gender.isNotEmpty) merged = merged.copyWith(gender: remote.gender);
+          if (remote.zodiac.isNotEmpty) merged = merged.copyWith(zodiac: _normalizeZodiac(remote.zodiac));
+          if (remote.marital.isNotEmpty) merged = merged.copyWith(marital: remote.marital);
+          // Merge remote photoUrl for cross-device avatar
+          if ((remote.photoUrl ?? '').toString().isNotEmpty) {
+            merged = merged.copyWith(photoUrl: remote.photoUrl);
+          }
+          _profile = merged;
+          // persist locally
+          await sp.setString(_kKey, json.encode(_profile.toJson()));
+        }
+      }
+    } catch (_) {}
     notifyListeners();
   }
 
@@ -56,9 +86,40 @@ class ProfileController with ChangeNotifier {
 
   Future<void> save(UserProfile p) async {
     // Ensure zodiac is normalized before persisting
-    _profile = p.copyWith(zodiac: _normalizeZodiac(p.zodiac));
+    var next = p.copyWith(zodiac: _normalizeZodiac(p.zodiac));
+    // Attempt upload of local photo to Firebase Storage, set photoUrl
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final path = p.photoPath;
+      if (uid != null && path != null && path.isNotEmpty) {
+        final file = File(path);
+        if (await file.exists()) {
+          final ref = FirebaseStorage.instance.ref().child('users').child(uid).child('profile').child('avatar.jpg');
+          await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
+          final url = await ref.getDownloadURL();
+          if (url.isNotEmpty) {
+            next = next.copyWith(photoUrl: url);
+          }
+        }
+      }
+    } catch (_) {}
+    // Preserve existing remote url if no new upload
+    if ((next.photoUrl == null || next.photoUrl!.isEmpty) && (_profile.photoUrl != null && _profile.photoUrl!.isNotEmpty)) {
+      next = next.copyWith(photoUrl: _profile.photoUrl);
+    }
+    _profile = next;
     final sp = await SharedPreferences.getInstance();
     await sp.setString(_kKey, json.encode(_profile.toJson()));
+    // Push to Firestore (best-effort)
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .set(_profile.toJson(), SetOptions(merge: true));
+      }
+    } catch (_) {}
     notifyListeners();
   }
 
@@ -72,6 +133,13 @@ class ProfileController with ChangeNotifier {
       chatLength = length;
       await sp.setString(_kChatLength, chatLength);
     }
+    notifyListeners();
+  }
+
+  Future<void> clearLocal() async {
+    _profile = UserProfile.empty();
+    final sp = await SharedPreferences.getInstance();
+    await sp.remove(_kKey);
     notifyListeners();
   }
 }

@@ -17,6 +17,9 @@ import 'profile_controller.dart';
 import 'user_profile.dart';
 import '../../common/widgets/gold_bar.dart';
 import '../../theme/app_theme.dart';
+import '../../core/referral/referral_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -47,9 +50,12 @@ class ProfilePage extends StatelessWidget {
     }
 
     final p = profileCtrl.profile;
-    final avatar = (p.photoPath != null && p.photoPath!.isNotEmpty)
-        ? FileImage(File(p.photoPath!))
-        : null as ImageProvider?;
+    ImageProvider? avatar;
+    if (p.photoPath != null && p.photoPath!.isNotEmpty) {
+      try { avatar = FileImage(File(p.photoPath!)); } catch (_) { avatar = null; }
+    } else if (p.photoUrl != null && p.photoUrl!.isNotEmpty) {
+      avatar = NetworkImage(p.photoUrl!);
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.t('profile.title'))),
@@ -123,6 +129,87 @@ class ProfilePage extends StatelessWidget {
               title: Text(loc.t('profile.wallet')),
               trailing: Text('${ent.coins}'),
             ),
+          ),
+          const SizedBox(height: 12),
+
+          // Refer a friend & Promo code buttons
+          ElevatedButton.icon(
+            icon: const Icon(Icons.group_add_outlined),
+            onPressed: () async {
+              final code = await ReferralService.myCode();
+              if (!context.mounted) return;
+              await showModalBottomSheet(
+                context: context,
+                showDragHandle: true,
+                backgroundColor: const Color(0xFF121018),
+                builder: (ctx) {
+                  final ctrl = TextEditingController();
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Arkadasini getir – 1 fal hakki kazan', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          Expanded(child: SelectableText(code, style: const TextStyle(fontSize: 16))),
+                          const SizedBox(width: 8),
+                          OutlinedButton(onPressed: () async { await ReferralService.shareMyCode(ctx); }, child: const Text('Paylas')),
+                        ]),
+                        const SizedBox(height: 12),
+                        const Text('Arkadas kodu gir:'),
+                        const SizedBox(height: 6),
+                        TextField(controller: ctrl, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'KOD')), 
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final ok = await ReferralService.redeemReferral(code: ctrl.text, ent: ent);
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? '+1 fal hakki (100 coin) verildi' : 'Kod kullanilamadi')));
+                              }
+                            },
+                            child: const Text('Kullan'),
+                          ),
+                        )
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+            label: const Text('Arkadasini getir – 1 fal hakki kazan'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.card_giftcard_outlined),
+            onPressed: () async {
+              final ctrl = TextEditingController();
+              await showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Promosyon Kodu'),
+                  content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'Kodu gir (1 kez, 1 fal hakki)')),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Iptal')),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final ok = await ReferralService.redeemPromo(code: ctrl.text, ent: ent);
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Promosyon: +1 fal hakki (100 coin) verildi' : 'Gecersiz kod veya daha once kullanildi')));
+                        }
+                      },
+                      child: const Text('Kullan'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            label: const Text('Promosyon Kodu'),
           ),
           const SizedBox(height: 12),
 
@@ -229,7 +316,25 @@ class ProfilePage extends StatelessWidget {
                   .push(MaterialPageRoute(builder: (_) => const PrivacyPage())),
               child: Text(loc.t('legal.privacy_short')),
             ),
-          ])
+          ]),
+          const SizedBox(height: 16),
+          // Sign out
+          ElevatedButton.icon(
+            icon: const Icon(Icons.logout),
+            label: const Text('Çıkış Yap'),
+            onPressed: () async {
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('remember_me', false);
+                await prefs.setBool('just_signed_up', false);
+              } catch (_) {}
+              try { await FirebaseAuth.instance.signOut(); } catch (_) {}
+              if (context.mounted) {
+                // root’a dön ve auth’a git
+                context.go('/auth');
+              }
+            },
+          )
         ],
       ),
     );

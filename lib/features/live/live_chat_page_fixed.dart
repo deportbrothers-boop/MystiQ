@@ -70,7 +70,8 @@ class _LiveChatPageState extends State<LiveChatPage> {
     ).listen((chunk) {
       if (!mounted) return;
       setState(() {
-        msgs[assistantIndex].text += chunk;
+        // Replace with the latest accumulated chunk to avoid duplication.
+        msgs[assistantIndex].text = chunk;
         typing = false;
       });
     }, onError: (_) {

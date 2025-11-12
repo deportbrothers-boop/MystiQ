@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../core/i18n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/access/access_gate.dart';
 import '../../../core/access/sku_costs.dart';
 import 'package:provider/provider.dart';
-import '../../../core/ai/local_generator.dart';
+import '../../../core/ai/ai_service.dart';
 import '../../profile/profile_controller.dart';
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
@@ -41,19 +41,22 @@ class _DreamPageState extends State<DreamPage> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () async {
+                // Unified flow: schedule + countdown for all readings
+                await _startDream(context);
+                return;
                 final ok = await AccessGate.ensureAccessOrPaywall(
                   context,
                   sku: 'reading.dream',
                   coinCost: SkuCosts.dream,
                 );
                 if (ok && context.mounted) {
-                  // Yorumu hemen üret ve geçmişe kaydet; sonra Result'a gönder
+                  // Yorumu hemen Ã¼ret ve geÃ§miÅŸe kaydet; sonra Result'a gÃ¶nder
                   final profile = context.read<ProfileController>().profile;
                   final locale = Localizations.localeOf(context).languageCode;
-                  final generated = LocalAIGenerator.generate(
+                  final generated = await AiService.generate(
                     type: 'dream',
                     profile: profile,
-                    extras: {'text': ctrl.text, 'style': 'poetic'},
+                    extras: {'text': ctrl.text},
                     locale: locale,
                   );
                   try {
@@ -70,14 +73,9 @@ class _DreamPageState extends State<DreamPage> {
                     context.push('/reading/result/dream', extra: entry);
                   } catch (_) {
                     if (!context.mounted) return;
-                    context.push(
-                      '/reading/result/dream',
-                      extra: {
-                        'text': generated,
-                        'noStream': true,
-                        'forceLocal': true,
-                      },
-                    );
+                    context.push('/reading/result/dream', extra: {
+                      'text': generated,
+                    });
                   }
                 }
               },
@@ -87,7 +85,7 @@ class _DreamPageState extends State<DreamPage> {
                 final loc = AppLocalizations.of(context);
                 final reason = ent.isPremium
                     ? (loc.t('premium.free_reason') != 'premium.free_reason' ? loc.t('premium.free_reason') : 'Premium: 0 coin')
-                    : (loc.t('first_free.reason') != 'first_free.reason' ? loc.t('first_free.reason') : 'İlk fal ücretsiz: 0 coin');
+                    : (loc.t('first_free.reason') != 'first_free.reason' ? loc.t('first_free.reason') : 'Ä°lk fal Ã¼cretsiz: 0 coin');
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -110,6 +108,46 @@ class _DreamPageState extends State<DreamPage> {
     );
   }
 }
+
+extension on _DreamPageState {
+  Future<void> _startDream(BuildContext context) async {
+    final ok = await AccessGate.ensureAccessOrPaywall(
+      context,
+      sku: 'reading.dream',
+      coinCost: SkuCosts.dream,
+    );
+    if (!ok || !context.mounted) return;
+
+    try {
+      final profile = context.read<ProfileController>().profile;
+      final locale = Localizations.localeOf(context).languageCode;
+      final generated = await AiService.generate(
+        type: 'dream',
+        profile: profile,
+        extras: {'text': ctrl.text, 'style': _style},
+        locale: locale,
+      );
+      final hc = context.read<HistoryController>();
+      final entry = HistoryEntry(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: 'dream',
+        title: AppLocalizations.of(context).t('dream.title'),
+        text: generated,
+        createdAt: DateTime.now(),
+      );
+      await hc.add(entry);
+      if (!context.mounted) return;
+      context.push('/reading/result/dream', extra: entry);
+    } catch (_) {
+      if (!context.mounted) return;
+      context.push('/reading/result/dream', extra: {
+        'text': ctrl.text,
+        'style': _style,
+      });
+    }
+  }
+}
+
 
 
 

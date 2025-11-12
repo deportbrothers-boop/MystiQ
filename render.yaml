@@ -6,9 +6,10 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      - key: NODE_VERSION
+        value: 20
       - key: OPENAI_API_KEY
         sync: false
       - key: APP_TOKEN
         sync: false
     autoDeploy: true
-

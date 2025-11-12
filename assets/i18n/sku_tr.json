@@ -1,0 +1,13 @@
+﻿{
+  "sku.sub.premium.weekly.label": "HaftalÄ±k Premium",
+  "sku.sub.premium.weekly.desc": "HaftalÄ±k reklamsÄ±z + sÄ±nÄ±rsÄ±z fal",
+  "sku.sub.premium.monthly.label": "AylÄ±k Premium",
+  "sku.sub.premium.monthly.desc": "ReklamsÄ±z deneyim, sÄ±nÄ±rsÄ±z fal ve Ã¶zel kart setleri",
+  "sku.sub.premium.quarterly.label": "3 AylÄ±k Premium",
+  "sku.sub.premium.quarterly.desc": "%10 indirimli paket",
+  "sku.sub.premium.yearly.label": "YÄ±llÄ±k Premium",
+  "sku.sub.premium.yearly.desc": "%35 indirim",
+  "sku.lifetime.mystic_plus.label": "Mystic+ (Ã–mÃ¼r Boyu)",
+  "sku.lifetime.mystic_plus.desc": "Ã–mÃ¼r boyu tÃ¼m iÃ§erik + AR ve AI"
+}
+

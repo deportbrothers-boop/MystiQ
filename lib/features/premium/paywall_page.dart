@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../../core/entitlements/entitlements_controller.dart';
 import '../../common/widgets/gold_button.dart';
@@ -23,7 +24,7 @@ class PaywallPage extends StatelessWidget {
         final catalog = snap.data!;
         final skus = {
           ...catalog.subscriptions.map((e) => e.sku),
-          ...catalog.onetime.map((e) => e.sku),
+          // Single-purchase items disabled
           ...catalog.coins.map((e) => e.sku),
         };
         return MultiProvider(
@@ -85,8 +86,8 @@ class _PaywallViewState extends State<_PaywallView> {
           ),
           child: SafeArea(
             child: DefaultTabController(
-              length: 3,
-              initialIndex: 2,
+              length: 2,
+              initialIndex: 1,
               child: Column(
                 children: [
                   const SizedBox(height: 8),
@@ -97,7 +98,6 @@ class _PaywallViewState extends State<_PaywallView> {
                   TabBar(
                     tabs: [
                       Tab(text: loc.t('paywall.tab.subs')),
-                      Tab(text: loc.t('paywall.tab.onetime')),
                       Tab(text: loc.t('paywall.tab.coins')),
                     ],
                     indicatorColor: AppTheme.gold,
@@ -129,17 +129,12 @@ class _PaywallViewState extends State<_PaywallView> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton(onPressed: () => DefaultTabController.of(context).animateTo(2), child: Text(loc.t('paywall.open_coin_tab'))),
-                      ),
                     ]),
                   ),
                   const SizedBox(height: 8),
                   Expanded(
                     child: TabBarView(children: [
                       _ListView(items: widget.catalog.subscriptions),
-                      _ListView(items: widget.catalog.onetime),
                       _ListView(items: widget.catalog.coins),
                     ]),
                   ),
@@ -196,6 +191,7 @@ class _ProductTile extends StatelessWidget {
     final ent = context.watch<EntitlementsController>();
     final store = context.watch<PurchaseController>();
     final isSub = item.category == 'subscriptions';
+    final isCoin = item.category == 'coins';
     final storeProduct = store.products[item.sku];
     final loc = AppLocalizations.of(context);
     return Container(
@@ -211,26 +207,33 @@ class _ProductTile extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_skuLabel(context, item, loc), style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(_fixTr(_skuLabel(context, item, loc)), style: const TextStyle(fontWeight: FontWeight.w700)),
             if (_skuDesc(context, item, loc) != null) ...[
               const SizedBox(height: 4),
-              Text(_skuDesc(context, item, loc)!, style: Theme.of(context).textTheme.bodySmall)
+              Text(_fixTr(_skuDesc(context, item, loc)!), style: Theme.of(context).textTheme.bodySmall)
             ],
           ]),
         ),
-        GoldButton(
-          text: _formattedPrice(context, storeProduct?.price, item, loc),
-          onPressed: () async {
-            if (store.available && store.products.containsKey(item.sku)) {
-              await store.buy(item.sku);
-            } else {
-              await ent.grantFromSku(item.sku);
-              if (!context.mounted) return;
-              final name = _skuLabel(context, item, loc);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name ${loc.t('paywall.activated_mock')}')));
-            }
-          },
-        )
+        if (item.sku != 'lifetime.mystic_plus') TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.gold,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+                onPressed: () async {
+                  if (store.available && store.products.containsKey(item.sku)) {
+                    await store.buy(item.sku);
+                  } else {
+                    await ent.grantFromSku(item.sku);
+                    if (!context.mounted) return;
+                    final name = _skuLabel(context, item, loc);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name ${loc.t('paywall.activated_mock')}')));
+                  }
+                },
+                child: Text(
+                  _formattedPrice(context, storeProduct?.price, item, loc),
+                  style: const TextStyle(color: AppTheme.gold, fontWeight: FontWeight.w700),
+                ),
+              )
       ]),
     );
   }
@@ -249,14 +252,19 @@ class _HeroCard extends StatelessWidget {
         border: Border.all(color: AppTheme.gold.withValues(alpha: 0.45), width: 1.4),
         boxShadow: [BoxShadow(color: AppTheme.gold.withValues(alpha: 0.25), blurRadius: 18, spreadRadius: 1)],
       ),
-      child: Row(children: [const Icon(Icons.star, color: AppTheme.gold), const SizedBox(width: 12), Expanded(child: Text(loc.t('paywall.hero'), style: const TextStyle(fontWeight: FontWeight.w600)))]),
+      child: Row(children: [const Icon(Icons.star, color: AppTheme.gold), const SizedBox(width: 12), Expanded(child: Text(_fixTr(loc.t('paywall.hero')), style: const TextStyle(fontWeight: FontWeight.w600)))]),
     );
   }
 }
 
 String _formattedPrice(BuildContext context, String? storePrice, CatalogItem item, AppLocalizations loc){
-  if (storePrice != null && storePrice.isNotEmpty) return storePrice;
   final locale = Localizations.localeOf(context);
+  // Force TRY display for Turkish users when we have a TRY price in catalog
+  if (locale.languageCode.toLowerCase() == 'tr' && item.prices != null && item.prices!.containsKey('TRY')) {
+    final amt = item.prices!['TRY']!;
+    return PriceFormatter.format(amount: amt, currency: 'TRY', locale: const Locale('tr', 'TR'));
+  }
+  if (storePrice != null && storePrice.isNotEmpty) return storePrice;
   // Prefer multi-currency price if available
   if (item.prices != null && item.prices!.isNotEmpty) {
     final target = PriceFormatter.pickCurrencyForLocale(locale, supported: item.prices!.keys);
@@ -282,4 +290,41 @@ String? _skuDesc(BuildContext context, CatalogItem item, AppLocalizations loc) {
   final v = loc.t(key);
   if (v != key) return v;
   return item.desc;
+}
+
+String _fixTr(String s) {
+  if (s.isEmpty) return s;
+  var out = s;
+  // Multi-pass Latin1->UTF8 repair for double-encoded fragments (e.g., Ã„Â±)
+  for (var i = 0; i < 3; i++) {
+    try {
+      final repaired = utf8.decode(latin1.encode(out), allowMalformed: true);
+      if (repaired == out) break;
+      out = repaired;
+    } catch (_) { break; }
+  }
+  const map = {
+    'Ã§':'ç','Ã¶':'ö','Ã¼':'ü','Ä±':'ı','ÄŸ':'ğ','ÅŸ':'ş',
+    'Ã‡':'Ç','Ã–':'Ö','Ãœ':'Ü','Ä°':'İ','Äž':'Ğ','Åž':'Ş',
+    'â€™':'’','â€˜':'‘','â€œ':'“','â€':'”','â€“':'–','â€”':'—','â€¢':'•',
+    'Â·':'·','Â':'',
+  };
+  map.forEach((k,v){ out = out.replaceAll(k, v); });
+  out = out.replaceAll('\uFFFD', '');
+  return out;
+}
+
+String _fixText(String s) {
+  if (s.isEmpty) return s;
+  var out = s;
+  try { out = utf8.decode(latin1.encode(out)); } catch (_) {}
+  const map = {
+    'Ã§':'ç','Ã¶':'ö','Ã¼':'ü','Ä±':'ı','ÄŸ':'ğ','ÅŸ':'ş',
+    'Ã‡':'Ç','Ã–':'Ö','Ãœ':'Ü','Ä°':'İ','Äž':'Ğ','Åž':'Ş',
+    'â€™':'’','â€˜':'‘','â€œ':'“','â€':'”','â€“':'–','â€”':'—','â€¢':'•',
+    'Â·':'·','Â':'',
+  };
+  map.forEach((k,v){ out = out.replaceAll(k, v); });
+  out = out.replaceAll('\uFFFD', '');
+  return out;
 }

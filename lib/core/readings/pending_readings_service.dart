@@ -1,4 +1,4 @@
-ï»¿import 'dart:convert';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../notifications/notifications_service.dart';
 import '../../features/history/history_controller.dart';
@@ -155,13 +155,13 @@ class PendingReadingsService {
         }
         final type = (it['type'] as String?) ?? 'coffee';
         final extras = (it['extras'] as Map?)?.cast<String, dynamic>();
-        // Always generate and save when due so sonuÃ§ hem ekranda hem geÃ§miÅŸe dÃ¼ÅŸsÃ¼n
+        // Always generate and save when due so sonuç hem ekranda hem geçmiþe düþsün
         String generated;
         try {
           AiService.configure();
           generated = await AiService.generate(type: type, profile: profile.profile, extras: extras, locale: locale);
         } catch (_) {
-          generated = LocalAIGenerator.generate(type: type, profile: profile.profile, extras: extras, locale: locale);
+          generated = 'Üretim þu anda yapýlamýyor.';
         }
         final entry = HistoryEntry(
           id: it['id'] as String,
@@ -178,3 +178,4 @@ class PendingReadingsService {
     await _save(remaining);
   }
 }
+

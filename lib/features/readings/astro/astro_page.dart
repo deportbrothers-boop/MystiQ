@@ -3,13 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/ai/ai_service.dart';
-import '../../../core/ai/local_generator.dart';
+import '../../../core/ads/rewarded_helper.dart';
 import '../../profile/profile_controller.dart';
 import '../../../core/entitlements/entitlements_controller.dart';
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
 import '../../../core/i18n/app_localizations.dart';
-import '../../../core/readings/pending_readings_service.dart';
 import '../../../core/access/access_gate.dart';
 import '../../../core/access/sku_costs.dart';
 
@@ -48,36 +47,7 @@ class _AstroPageState extends State<AstroPage> {
             Text('${loc.t('astro.zodiac')}${profile.zodiac.isEmpty ? '-' : profile.zodiac}'),
             const SizedBox(height: 12),
             // Üslup (Pratik / Spiritüel)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 4),
-                    child: Text(
-                      loc.t('astro.style.title') != 'astro.style.title' ? loc.t('astro.style.title') : 'Üslup',
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: Text(loc.t('astro.style.practical') != 'astro.style.practical' ? loc.t('astro.style.practical') : 'Pratik'),
-                        selected: _style == 'practical',
-                        onSelected: (_) => setState(() => _style = 'practical'),
-                      ),
-                      ChoiceChip(
-                        label: Text(loc.t('astro.style.spiritual') != 'astro.style.spiritual' ? loc.t('astro.style.spiritual') : 'Spiritüel'),
-                        selected: _style == 'spiritual',
-                        onSelected: (_) => setState(() => _style = 'spiritual'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+
             const SizedBox(height: 8),
             if (text != null)
               Expanded(child: SingleChildScrollView(child: Text(text!)))
@@ -86,6 +56,8 @@ class _AstroPageState extends State<AstroPage> {
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: () async {
+                await _startAstro(context);
+                return;
                 final ok = await AccessGate.ensureCoinsOnlyOrPaywall(
                   context,
                   coinCost: SkuCosts.astro,
@@ -94,7 +66,7 @@ class _AstroPageState extends State<AstroPage> {
                 try {
                   final profile = context.read<ProfileController>().profile;
                   final locale = Localizations.localeOf(context).languageCode;
-                  final generated = LocalAIGenerator.generate(
+                  final generated = await AiService.generate(
                     type: 'astro',
                     profile: profile,
                     extras: {'style': _style},
@@ -116,12 +88,13 @@ class _AstroPageState extends State<AstroPage> {
                   // Fallback: Result sayfasında yerelde üret
                   context.push('/reading/result/astro', extra: {
                     'style': _style,
-                    'noStream': true,
-                    'forceLocal': true,
                   });
                 }
               },
-              child: Text(loc.t('astro.create_button')),
+              child: Builder(builder: (ctx) {
+                final t = AppLocalizations.of(ctx).t('astro.entry.watch_and_read');
+                return Text(t != 'astro.entry.watch_and_read' ? t : 'Reklam izle, Yorum Al');
+              }),
             ),
           ],
         ),
@@ -129,4 +102,50 @@ class _AstroPageState extends State<AstroPage> {
     );
   }
 }
+
+extension on _AstroPageState {
+  Future<void> _startAstro(BuildContext context) async {
+    // Require watching a rewarded ad to use astrology
+    final okAd = await RewardedAds.show(context: context);
+    if (!okAd || !mounted) {
+      if (mounted) {
+        final loc = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('tarot.fast.ad_failed') != 'tarot.fast.ad_failed' ? loc.t('tarot.fast.ad_failed') : 'Reklam gösterilemedi. Tekrar deneyin.')),
+        );
+      }
+      return;
+    }
+    try { await RewardedAds.recordOne(); } catch (_) {}
+
+    try {
+      final profile = context.read<ProfileController>().profile;
+      final locale = Localizations.localeOf(context).languageCode;
+      final generated = await AiService.generate(
+        type: 'astro',
+        profile: profile,
+        extras: {'style': _style},
+        locale: locale,
+      );
+      final hc = context.read<HistoryController>();
+      final entry = HistoryEntry(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: 'astro',
+        title: AppLocalizations.of(context).t('astro.title'),
+        text: generated,
+        createdAt: DateTime.now(),
+      );
+      await hc.add(entry);
+      if (!mounted) return;
+      context.push('/reading/result/astro', extra: entry);
+    } catch (_) {
+      if (!mounted) return;
+      // Fallback: Result sayfasında yerelde üret
+      context.push('/reading/result/astro', extra: {
+        'style': _style,
+      });
+    }
+  }
+}
+
 

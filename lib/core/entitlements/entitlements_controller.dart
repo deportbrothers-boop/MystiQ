@@ -18,6 +18,7 @@ class EntitlementsController with ChangeNotifier {
   String? _energyYmd;
   String? lastUnlockMethod; // 'coins' | 'premium' | 'first_free' | 'ticket'
   int _updatedAtMs = 0; // local last-change marker (ms since epoch)
+  String? _lastUid; // for detecting account switch
 
   bool get isPremium =>
       premiumSku == 'lifetime.mystic_plus' ||
@@ -25,6 +26,7 @@ class EntitlementsController with ChangeNotifier {
 
   Future<void> load() async {
     final sp = await SharedPreferences.getInstance();
+    _lastUid = sp.getString('ent_last_uid');
     premiumSku = sp.getString(_kPremiumSku);
     final untilStr = sp.getString(_kPremiumUntil);
     if (untilStr != null) premiumUntil = DateTime.tryParse(untilStr);
@@ -38,9 +40,45 @@ class EntitlementsController with ChangeNotifier {
 
     // Try remote -> local sync (if logged in)
     try {
+      // Detect account switch and reset local cache to avoid showing previous user's data
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null && uid != _lastUid) {
+        await _resetLocalForNewUser(sp, uid);
+      }
       await _syncFromRemote();
     } catch (_) {
       // ignore remote failures to avoid blocking app
+    }
+  }
+
+  Future<void> _resetLocalForNewUser(SharedPreferences sp, String uid) async {
+    premiumSku = null;
+    premiumUntil = null;
+    coins = 0;
+    firstFreeUsed = false;
+    energy = 70;
+    tickets = 0;
+    _energyYmd = null;
+    lastUnlockMethod = null;
+    _updatedAtMs = 0;
+    _lastUid = uid;
+    await sp.remove(_kPremiumSku);
+    await sp.remove(_kPremiumUntil);
+    await sp.setInt(_kCoins, coins);
+    await sp.setBool(_kFirstFreeUsed, firstFreeUsed);
+    await sp.setInt('energy', energy);
+    await sp.setInt('tickets', tickets);
+    await sp.remove('energyYmd');
+    await sp.setString('ent_last_uid', uid);
+    notifyListeners();
+  }
+
+  Future<void> switchToCurrentUser() async {
+    final sp = await SharedPreferences.getInstance();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null && uid != _lastUid) {
+      await _resetLocalForNewUser(sp, uid);
+      try { await _syncFromRemote(); } catch (_) {}
     }
   }
 
@@ -60,7 +98,12 @@ class EntitlementsController with ChangeNotifier {
     await sp.setInt('ent_updatedAtMs', _updatedAtMs);
 
     if (!skipRemote) {
-      try { await _persistRemote(); } catch (_) {}
+      // Do not block UI/navigation on remote write when services are unavailable.
+      try {
+        // fire-and-forget; errors ignored
+        // ignore: unawaited_futures
+        Future.microtask(() async { try { await _persistRemote(); } catch (_) {} });
+      } catch (_) {}
     }
   }
 

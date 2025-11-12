@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/entitlements/entitlements_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/ads/rewarded_helper.dart';
 import '../../core/i18n/app_localizations.dart';
 import '../../common/widgets/sharp_image.dart';
 
@@ -230,19 +232,44 @@ class _CoverImage extends StatelessWidget {
 
 class _MotivationBanner extends StatelessWidget {
   _MotivationBanner();
+  Future<void> _openWithAd(BuildContext context) async {
+    final sp = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final ymd = '${now.year}-${now.month}-${now.day}';
+    final usedYmd = sp.getString('motivation_ymd');
+    if (usedYmd == ymd) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).t('motivation.daily_used') != 'motivation.daily_used'
+            ? AppLocalizations.of(context).t('motivation.daily_used')
+            : 'Bugunun motivasyonu zaten alinmis.')),
+      );
+      return;
+    }
+    final ok = await RewardedAds.show(context: context);
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).t('ad.failed') != 'ad.failed'
+            ? AppLocalizations.of(context).t('ad.failed')
+            : 'Reklam gosterilemedi. Tekrar deneyin.')),
+      );
+      return;
+    }
+    try { await RewardedAds.recordOne(); } catch (_) {}
+    await sp.setString('motivation_ymd', ymd);
+    if (context.mounted) context.push('/motivation');
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
-    final now = DateTime.now();
-    final tipKey = 'daily.tip.${(((now.weekday - 1) % 7) + 1)}';
-    final tip = loc.t(tipKey);
-    final title = AppLocalizations.of(context).t('motivation.title');
+    final title = 'Gunluk Motivasyon';
+    final tip = '';
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => context.push('/motivation'),
+        onTap: () async { await _openWithAd(context); },
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
@@ -278,6 +305,7 @@ class _MotivationBanner extends StatelessWidget {
                     Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
                     Text(
+                      // Kısa motivasyon ipucu; eski "tek cumlelik niyet" metnini kaldırdık
                       tip,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,

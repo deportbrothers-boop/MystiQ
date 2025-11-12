@@ -7,7 +7,7 @@ import '../../../core/i18n/app_localizations.dart';
 import '../../../core/access/access_gate.dart';
 import '../../../core/access/sku_costs.dart';
 import '../../../core/analytics/analytics.dart';
-import '../../../core/readings/pending_readings_service.dart';
+import '../../../core/readings/pending_readings_service_fixed.dart';
 import '../../../common/widgets/scanning_overlay.dart';
 import 'package:provider/provider.dart';
 import '../../../core/entitlements/entitlements_controller.dart';
@@ -234,7 +234,17 @@ class _PalmPageState extends State<PalmPage> {
                           );
                           if (!ok) return;
                           if (!mounted) return;
-                          setState(() => scanning = true);
+                          // If access was granted via coins, skip waiting and navigate immediately
+                          final entNow = context.read<EntitlementsController>();
+                          if (entNow.lastUnlockMethod == 'coins') {
+                            context.push('/reading/result/palm', extra: {
+                              'imagePath': image!.path,
+                              'style': _style,
+                              // streaming/local flags removed
+                            });
+                          } else {
+                            setState(() => scanning = true);
+                          }
                         },
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -267,28 +277,35 @@ class _PalmPageState extends State<PalmPage> {
 
         if (scanning)
           ScanningOverlay(
-            onDone: () {
+            onDone: () async {
               if (!mounted) return;
               setState(() => scanning = false);
-              final readyAt = DateTime.now().add(const Duration(minutes: 10));
-              // Schedule a reminder notification only (avoid duplicate history generation)
+              // Planlı üretim: geri sayım ve reklamla hızlandırma için pending oluştur
+              final eta = const Duration(minutes: 5);
+              final readyAt = DateTime.now().add(eta);
+              String? pendingId;
               try {
-                PendingReadingsService.schedule(
+                final locale = Localizations.localeOf(context).languageCode;
+                pendingId = await PendingReadingsService.schedule(
                   type: 'palm',
                   readyAt: readyAt,
-                  extras: {'notifyOnly': true},
-                  locale: Localizations.localeOf(context).languageCode,
+                  extras: {
+                    'imagePath': image!.path,
+                    'style': _style,
+                  },
+                  locale: locale,
                 );
               } catch (_) {}
+              if (!mounted) return;
               context.push('/reading/result/palm', extra: {
                 'imagePath': image!.path,
+                'style': _style,
                 'sessionId': DateTime.now().millisecondsSinceEpoch,
-                'etaSeconds': const Duration(minutes: 10).inSeconds,
+                'etaSeconds': eta.inSeconds,
                 'readyAt': readyAt.toIso8601String(),
                 'generateAtReady': true,
-                // 'style': _style,
-                'noStream': true,
-                'forceLocal': true,
+                // streaming/local flags removed
+                if (pendingId != null) 'pendingId': pendingId,
               });
             },
           ),
@@ -321,4 +338,5 @@ class _PalmStarsPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PalmStarsPainter old) => old.goldAlpha != goldAlpha || old.starCount != starCount;
 }
+
 

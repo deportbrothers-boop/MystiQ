@@ -7,13 +7,13 @@ import 'features/history/history_controller.dart';
 import 'core/rewards/rewards_controller.dart';
 import 'features/profile/profile_controller.dart';
 import 'core/ads/ad_service.dart';
+import 'core/ads/consent_helper.dart';
 import 'core/i18n/app_localizations.dart';
 import 'core/i18n/locale_controller.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/notifications/notifications_service.dart';
-import 'core/readings/pending_readings_service.dart';
+import 'core/readings/pending_readings_service_fixed.dart';
 import 'core/ai/ai_service.dart';
-import 'features/auth/verify_controller.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
@@ -39,7 +39,9 @@ Future<void> main() async {
       debugPrint('FlutterError: \n${details.exceptionAsString()}');
     };
     AiService.configure();
-    AdService.init();
+    // Ask for ad consent if required (EEA/UK). Do not block startup on failure.
+    try { await AdConsent.requestIfRequired(); } catch (_) {}
+    await AdService.init();
     // Fire-and-forget notifications init
     // ignore: unawaited_futures
     NotificationsService.init().catchError((e){ debugPrint('Notifications init failed: $e'); });
@@ -109,7 +111,6 @@ class MystiQApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: locale),
         ChangeNotifierProvider.value(value: rewards),
         ChangeNotifierProvider.value(value: profile),
-        ChangeNotifierProvider(create: (_) => VerifyController()),
       ],
       child: Consumer<LocaleController>(
         builder: (context, lc, _) => MaterialApp.router(
@@ -126,11 +127,15 @@ class MystiQApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
+          builder: (context, child) => child ?? const SizedBox.shrink(),
         ),
       ),
     );
   }
 }
+
+// Thin, right-to-left scrolling caption used for the global disclaimer
+// Disclaimer marquee removed per request
 
 // Tüm platformlarda overscroll glow/edge efektini devre dışı bırakır.
 class _NoGlowScrollBehavior extends MaterialScrollBehavior {

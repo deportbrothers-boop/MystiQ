@@ -12,7 +12,7 @@ import '../../../core/ads/rewarded_helper.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/entitlements/entitlements_controller.dart';
 import '../../../core/i18n/app_localizations.dart';
-import '../../../core/readings/pending_readings_service.dart';
+import '../../../core/readings/pending_readings_service_fixed.dart';
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
 import 'package:mystiq/features/readings/coffee/_thumb_slot.dart';
@@ -55,8 +55,7 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
           'etaSeconds': readyAt.difference(DateTime.now()).inSeconds.clamp(0, 86400),
           'readyAt': readyAt.toIso8601String(),
           'generateAtReady': true,
-          'noStream': true,
-          'forceLocal': true,
+          // streaming/local flags removed
         });
       } catch (_) {}
     });
@@ -119,12 +118,15 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
         }
       } catch (_) {}
     } else {
-      // no-op: keep eta 10 dk
+      // Coins path: no waiting
+      eta = Duration.zero;
     }
 
-    try {
+    if (eta > Duration.zero) {
+      try {
       final readyAt = DateTime.now().add(eta);
       final extras = <String, dynamic>{
+        'typeHint': 'coffee',
         if (cup1 != null || cup2 != null || saucer != null)
           'imagePaths': [
             if (cup1 != null) cup1!.path,
@@ -135,7 +137,7 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
         'topic': _topic,
         'style': _style,
         if (adUsed) 'adBoost': true,
-        'forceLocal': true,
+        // streaming/local flags removed
       };
       final locale = Localizations.localeOf(context).languageCode;
       final id = await PendingReadingsService.schedule(type: 'coffee', readyAt: readyAt, extras: extras, locale: locale);
@@ -154,11 +156,30 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
         ));
       } catch (_) {}
     } catch (_) {}
-    setState(() { scanning = true; _eta = eta; _adUsed = adUsed; });
+    }
+    if (eta > Duration.zero) {
+      setState(() { scanning = true; _eta = eta; _adUsed = adUsed; });
+    } else {
+      // Immediate navigation for coin flow
+      final paths = <String>[
+        if (cup1 != null) cup1!.path,
+        if (cup2 != null) cup2!.path,
+        if (saucer != null) saucer!.path,
+      ];
+      if (!mounted) return;
+      context.push('/reading/result/coffee', extra: {
+        'typeHint': 'coffee',
+        if (paths.isNotEmpty) 'imagePath': paths.first,
+        if (paths.isNotEmpty) 'imagePaths': paths,
+        'topic': _topic,
+        'style': _style,
+        // streaming/local flags removed
+      });
+    }
   }
 
   Future<void> _pickFor(String slot, ImageSource source) async {
-    final x = await ImagePicker().pickImage(source: source);
+    final x = await ImagePicker().pickImage(source: source, imageQuality: 85, maxWidth: 1600);
     if (x == null) return;
     setState(() {
       final f = File(x.path);
@@ -316,83 +337,18 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
                       foregroundColor: Colors.white70,
                       side: BorderSide.none,
                     ),
-                    icon: const Icon(Icons.image, size: 18),
-                    label: Text(loc.t('coffee.add_photo')),
-                    onPressed: () async {
-                      final slot = await _chooseSlot();
-                      if (slot == null) return;
-                      final source = await _chooseSource();
-                      if (source == null) return;
-                      await _pickFor(slot, source);
-                    },
+                    icon: const Icon(Icons.play_circle_outline, size: 18),
+                    label: Text(
+                      AppLocalizations.of(context).t('coffee.entry.watch_and_read') != 'coffee.entry.watch_and_read'
+                          ? AppLocalizations.of(context).t('coffee.entry.watch_and_read')
+                          : 'Reklam izle, Fal Bak',
+                    ),
+                    onPressed: () async { await _startReading(forceAd: true); },
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: () async {
-                        // Entry modal: "Reklam izle, Fal Bak" vs "Premium'a geç"
-                        final choice = await showModalBottomSheet<String>(
-                          context: context,
-                          showDragHandle: true,
-                          backgroundColor: const Color(0xFF121018),
-                          builder: (_) => SafeArea(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    AppLocalizations.of(context).t('coffee.entry.title') != 'coffee.entry.title'
-                                        ? AppLocalizations.of(context).t('coffee.entry.title')
-                                        : 'Devam etmeyi seçin',
-                                    style: const TextStyle(fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Row(children: [
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        icon: const Icon(Icons.play_circle_outline, size: 18),
-                                        onPressed: () => Navigator.pop(context, 'ad'),
-                                        label: Text(
-                                          AppLocalizations.of(context).t('coffee.entry.watch_and_read') != 'coffee.entry.watch_and_read'
-                                              ? AppLocalizations.of(context).t('coffee.entry.watch_and_read')
-                                              : 'Reklam izle, Fal Bak',
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () => Navigator.pop(context, 'coin'),
-                                        child: Text(
-                                          AppLocalizations.of(context).t('coffee.entry.coin') != 'coffee.entry.coin'
-                                              ? AppLocalizations.of(context).t('coffee.entry.coin')
-                                              : 'Coin ile Fal Bak',
-                                        ),
-                                      ),
-                                    ),
-                                  ])
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                        if (!mounted) return;
-                        if (choice == 'ad') {
-                          await _startReading(forceAd: true);
-                        } else if (choice == 'coin') {
-                          await _startReading();
-                        }
-                      },
+                      onPressed: () async { await _startReading(); },
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -409,7 +365,7 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
                             child: const Icon(Icons.info_outline, size: 16),
                           )
                         ],
-                      )
+                      ),
                     ),
                   ),
                 ],
@@ -440,8 +396,6 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
                     'generateAtReady': true,
                     'topic': _topic,
                     'style': _style,
-                    'noStream': true,
-                    'forceLocal': true,
                     if (_scheduledId != null) 'pendingId': _scheduledId,
                   });
                 },
@@ -452,3 +406,8 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
     );
   }
 }
+
+
+
+
+

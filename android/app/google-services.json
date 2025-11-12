@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "235671819295",
+    "project_id": "mystiq-64953",
+    "storage_bucket": "mystiq-64953.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:235671819295:android:7a70f901472f99260d312a",
+        "android_client_info": {
+          "package_name": "com.mystiq.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbn3tHKfz_QSaGGhoq9U6gIRx3dhlzJ0M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

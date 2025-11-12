@@ -24,15 +24,24 @@ class CatalogItem {
 
   static String _fix(String? s) {
     if (s == null || s.isEmpty) return s ?? '';
-    if (s.contains('Ã') || s.contains('Â') || s.contains('â')) {
+    var out = s;
+    // Multi-pass Latin1->UTF8 repair for double-encoded sequences (e.g., Ã„Â±)
+    for (var i = 0; i < 3; i++) {
       try {
-        final bytes = latin1.encode(s);
-        return utf8.decode(bytes);
-      } catch (_) {
-        return s;
-      }
+        final repaired = utf8.decode(latin1.encode(out), allowMalformed: true);
+        if (repaired == out) break;
+        out = repaired;
+      } catch (_) { break; }
     }
-    return s;
+    const map = {
+      'Ã§':'ç','Ã¶':'ö','Ã¼':'ü','Ä±':'ı','ÄŸ':'ğ','ÅŸ':'ş',
+      'Ã‡':'Ç','Ã–':'Ö','Ãœ':'Ü','Ä°':'İ','Äž':'Ğ','Åž':'Ş',
+      'â€™':'’','â€˜':'‘','â€œ':'“','â€':'”','â€“':'–','â€”':'—','â€¢':'•',
+      'Â·':'·','Â':'',
+    };
+    map.forEach((k,v){ out = out.replaceAll(k, v); });
+    out = out.replaceAll('\uFFFD', '');
+    return out;
   }
 
   factory CatalogItem.fromJson(Map<String, dynamic> j, String category) =>
@@ -62,12 +71,23 @@ class ProductCatalog {
   });
 
   static Future<ProductCatalog> load() async {
-    final txt = await rootBundle.loadString('assets/config/products.json');
+    String txt;
+    try {
+      // Prefer clean, UTF-8 safe catalog if present
+      txt = await rootBundle.loadString('assets/config/products_clean.json');
+    } catch (_) {
+      txt = await rootBundle.loadString('assets/config/products.json');
+    }
     final j = json.decode(txt) as Map<String, dynamic>;
     List<CatalogItem> parse(String key) =>
         (j[key] as List).map((e) => CatalogItem.fromJson(e, key)).toList();
+
+    final subs = parse('subscriptions')
+        .where((e) => e.sku != 'lifetime.mystic_plus')
+        .toList();
+
     return ProductCatalog(
-      subscriptions: parse('subscriptions'),
+      subscriptions: subs,
       onetime: parse('onetime'),
       coins: parse('coins'),
     );

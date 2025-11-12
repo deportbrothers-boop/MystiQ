@@ -1,11 +1,13 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 
 class RewardedAds {
   // Google test rewarded ad unit id
-  static const String _testUnit = 'ca-app-pub-3940256099942544/5224354917';
+  static const String _androidUnit = 'ca-app-pub-4678612524495888/4461067330';
+  static const String _iosUnit = 'ca-app-pub-4678612524495888/8396442918';
   static const String _kYmd = 'ad_coin_ymd';
   static const String _kCount = 'ad_coin_count';
 
@@ -13,25 +15,29 @@ class RewardedAds {
     final completer = Completer<bool>();
     try {
       await RewardedAd.load(
-        adUnitId: adUnitId ?? _testUnit,
+        adUnitId: adUnitId ?? (Platform.isIOS ? _iosUnit : _androidUnit),
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (RewardedAd ad) async {
+            debugPrint('[Rewarded] loaded: ' + ad.adUnitId);
             ad.fullScreenContentCallback = FullScreenContentCallback(
               onAdDismissedFullScreenContent: (ad) {
                 ad.dispose();
                 if (!completer.isCompleted) completer.complete(false);
               },
               onAdFailedToShowFullScreenContent: (ad, err) {
+                debugPrint('[Rewarded] show failed: ' + err.toString());
                 ad.dispose();
                 if (!completer.isCompleted) completer.complete(false);
               },
             );
             ad.show(onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
+              debugPrint('[Rewarded] user earned reward: ' + reward.amount.toString() + ' ' + reward.type);
               if (!completer.isCompleted) completer.complete(true);
             });
           },
           onAdFailedToLoad: (LoadAdError error) {
+            debugPrint('[Rewarded] load failed: ${error.code} ${error.message}');
             if (!completer.isCompleted) completer.complete(false);
           },
         ),
@@ -72,3 +78,4 @@ class RewardedAds {
     }
   }
 }
+

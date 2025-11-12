@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import 'history_controller.dart';
 import 'history_entry.dart';
-import '../../core/readings/pending_readings_service.dart';
+import '../../core/readings/pending_readings_service_fixed.dart';
+import '../profile/profile_controller.dart';
 import '../../core/ads/rewarded_helper.dart';
 import '../../core/analytics/analytics.dart';
 
@@ -17,6 +19,7 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   String _filter = 'all';
+  Timer? _autoReload;
 
   @override
   void initState() {
@@ -24,6 +27,26 @@ class _HistoryPageState extends State<HistoryPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HistoryController>().load();
     });
+    // Auto-reload while this page is visible so results written in background appear
+    _autoReload?.cancel();
+    _autoReload = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (!mounted) return;
+      try { await context.read<HistoryController>().load(); } catch (_) {}
+      // Also complete due scheduled readings while on History
+      try {
+        final hist = context.read<HistoryController>();
+        final prof = context.read<ProfileController>();
+        final locale = Localizations.localeOf(context).languageCode;
+        // ignore: unawaited_futures
+        PendingReadingsService.checkAndCompleteDue(history: hist, profile: prof, locale: locale);
+      } catch (_) {}
+    });
+  }
+
+  @override
+  void dispose() {
+    try { _autoReload?.cancel(); } catch (_) {}
+    super.dispose();
   }
 
   @override
@@ -138,7 +161,7 @@ class _HistoryCard extends StatelessWidget {
                       final newReady = DateTime.now().add(eta);
                       final id = item?['id'] as String?;
                       if (id != null) {
-                        await PendingReadingsService.updateReadyAt(id: id, type: 'tarot', readyAt: newReady, locale: Localizations.localeOf(context).languageCode);
+                        await PendingReadingsService.updateReadyAt(id: id, type: 'coffee', readyAt: newReady, locale: Localizations.localeOf(context).languageCode);
                       }
                     } catch (_) {}
                     try { await RewardedAds.recordOne(); } catch (_) {}
@@ -152,8 +175,6 @@ class _HistoryCard extends StatelessWidget {
                   'etaSeconds': eta.inSeconds.clamp(0, 86400),
                   'readyAt': DateTime.now().add(eta).toIso8601String(),
                   'generateAtReady': true,
-                  'noStream': true,
-                  'forceLocal': true,
                   if ((item?['id'] as String?) != null) 'pendingId': item?['id'],
                 });
                 return;
@@ -224,8 +245,6 @@ class _HistoryCard extends StatelessWidget {
                   'etaSeconds': eta.inSeconds.clamp(0, 86400),
                   'readyAt': DateTime.now().add(eta).toIso8601String(),
                   'generateAtReady': true,
-                  'noStream': true,
-                  'forceLocal': true,
                   if ((item?['id'] as String?) != null) 'pendingId': item?['id'],
                 });
                 return;

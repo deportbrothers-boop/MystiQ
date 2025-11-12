@@ -47,6 +47,12 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- AdMob iOS App ID -->
+		<key>GADApplicationIdentifier</key>
+		<string>ca-app-pub-4678612524495888~7139201562</string>
+		<!-- Optional: Tracking permission message for personalized ads -->
+		<key>NSUserTrackingUsageDescription</key>
+		<string>Kisisellestirilmis reklamlar gosterilebilmesi icin izleme izni istiyoruz.</string>
 		<!-- Photo library usage for picking profile pictures -->
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Profil fotoğrafınızı seçebilmeniz için fotoğraf arşivine erişim gerekir.</string>

@@ -1,315 +1,315 @@
-{
-  "subscriptions": [
-    {
-      "sku": "sub.premium.weekly",
-      "label": "HaftalÃ„Â±k Premium",
-      "price": "Ã¢â€šÂº49,99",
-      "amount": 49.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 49.99,
-        "USD": 1.99,
-        "EUR": 1.79,
-        "GBP": 1.59,
-        "JPY": 260,
-        "AUD": 2.99,
-        "CAD": 2.69,
-        "CHF": 1.79,
-        "AED": 7.29,
-        "SAR": 7.49
-      },
-      "desc": "HaftalÃ„Â±k reklamsÃ„Â±z + sÃ„Â±nÃ„Â±rsÃ„Â±z fal"
-    },
-    {
-      "sku": "sub.premium.monthly",
-      "label": "AylÃ„Â±k Premium",
-      "price": "Ã¢â€šÂº129,99",
-      "amount": 129.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 129.99,
-        "USD": 4.99,
-        "EUR": 4.49,
-        "GBP": 3.99,
-        "JPY": 650,
-        "AUD": 7.49,
-        "CAD": 6.79,
-        "CHF": 4.59,
-        "AED": 18.49,
-        "SAR": 18.99
-      },
-      "desc": "ReklamsÃ„Â±z deneyim, sÃ„Â±nÃ„Â±rsÃ„Â±z fal ve ÃƒÂ¶zel kart setleri"
-    },
-    {
-      "sku": "sub.premium.quarterly",
-      "label": "3 AylÃ„Â±k Premium",
-      "price": "Ã¢â€šÂº349,99",
-      "amount": 349.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 349.99,
-        "USD": 12.99,
-        "EUR": 11.99,
-        "GBP": 10.99,
-        "JPY": 1650,
-        "AUD": 19.99,
-        "CAD": 17.49,
-        "CHF": 12.49,
-        "AED": 47.99,
-        "SAR": 48.99
-      },
-      "desc": "%10 indirimli paket"
-    },
-    {
-      "sku": "sub.premium.yearly",
-      "label": "YÃ„Â±llÃ„Â±k Premium",
-      "price": "Ã¢â€šÂº999,99",
-      "amount": 999.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 999.99,
-        "USD": 34.99,
-        "EUR": 32.99,
-        "GBP": 29.99,
-        "JPY": 4500,
-        "AUD": 49.99,
-        "CAD": 46.99,
-        "CHF": 33.99,
-        "AED": 129.99,
-        "SAR": 134.99
-      },
-      "desc": "%35 indirim + ÃƒÂ¶zel avatar + mÃƒÂ¼zik"
-    },
-    {
-      "sku": "lifetime.mystic_plus",
-      "label": "Mystic+ (Ãƒ–mÃƒÂ¼r Boyu)",
-      "price": "Ã¢â€šÂº1.999,99",
-      "amount": 1999.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 1999.99,
-        "USD": 69.99,
-        "EUR": 64.99,
-        "GBP": 59.99,
-        "JPY": 9000,
-        "AUD": 99.99,
-        "CAD": 91.99,
-        "CHF": 66.99,
-        "AED": 259.99,
-        "SAR": 269.99
-      },
-      "desc": "Ãƒ–mÃƒÂ¼r boyu tÃƒÂ¼m iÃƒÂ§erik + AR & AI"
-    }
-  ],
-  "onetime": [
-    {
-      "sku": "reading.coffee_fast",
-      "label": "HÃ„Â±zlÃ„Â± Kahve FalÃ„Â±",
-      "price": "Ã¢â€šÂº39,99",
-      "amount": 39.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 39.99,
-        "USD": 1.49,
-        "EUR": 1.39,
-        "GBP": 1.19,
-        "JPY": 200,
-        "AUD": 2.49
-      },
-      "desc": "KÃ„Â±sa yorum + enerji"
-    },
-    {
-      "sku": "reading.tarot_deep",
-      "label": "Derin Tarot AÃƒÂ§Ã„Â±lÃ„Â±mÃ„Â±",
-      "price": "Ã¢â€šÂº79,99",
-      "amount": 79.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 79.99,
-        "USD": 2.99,
-        "EUR": 2.79,
-        "GBP": 2.49,
-        "JPY": 400,
-        "AUD": 4.49,
-        "CAD": 3.99,
-        "CHF": 2.89,
-        "AED": 10.99,
-        "SAR": 11.49
-      },
-      "desc": "7 kart geÃƒÂ§miÃ…Å¸-gelecek analizi"
-    },
-    {
-      "sku": "reading.love_match",
-      "label": "AÃ…Å¸k Uyumu FalÃ„Â±",
-      "price": "Ã¢â€šÂº89,99",
-      "amount": 89.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 89.99,
-        "USD": 3.49,
-        "EUR": 3.29,
-        "GBP": 2.99,
-        "JPY": 450,
-        "AUD": 4.99,
-        "CAD": 4.49,
-        "CHF": 3.39,
-        "AED": 12.99,
-        "SAR": 13.49
-      },
-      "desc": "Partner analizi + uyum"
-    },
-    {
-      "sku": "reading.palm_premium",
-      "label": "El FalÃ„Â± Premium",
-      "price": "Ã¢â€šÂº119,99",
-      "amount": 119.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 119.99,
-        "USD": 4.49,
-        "EUR": 4.29,
-        "GBP": 3.79,
-        "JPY": 600,
-        "AUD": 6.49,
-        "CAD": 5.99,
-        "CHF": 4.29,
-        "AED": 16.49,
-        "SAR": 16.99
-      },
-      "desc": "Ãƒâ€¡izgi okuma + kader"
-    },
-    {
-      "sku": "report.annual_2025",
-      "label": "Kader HaritasÃ„Â± 2025",
-      "price": "Ã¢â€šÂº199,99",
-      "amount": 199.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 199.99,
-        "USD": 6.99,
-        "EUR": 6.49,
-        "GBP": 5.99,
-        "JPY": 1000,
-        "AUD": 9.99,
-        "CAD": 8.99,
-        "CHF": 6.79,
-        "AED": 25.99,
-        "SAR": 26.99
-      },
-      "desc": "YÃ„Â±llÃ„Â±k astrolojik rapor (PDF)"
-    },
-    {
-      "sku": "reading.combo_karma",
-      "label": "Karma FalÃ„Â± (TÃƒÂ¼m Set)",
-      "price": "Ã¢â€šÂº249,99",
-      "amount": 249.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 249.99,
-        "USD": 8.99,
-        "EUR": 8.49,
-        "GBP": 7.99,
-        "JPY": 1300,
-        "AUD": 12.99,
-        "CAD": 11.99,
-        "CHF": 8.99,
-        "AED": 32.99,
-        "SAR": 34.49
-      },
-      "desc": "Kahve + Tarot + Enerji"
-    }
-  ],
-  "coins": [
-    {
-      "sku": "coin.100",
-      "label": "Mini 100 Coin",
-      "price": "Ã¢â€šÂº29,99",
-      "amount": 29.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 29.99,
-        "USD": 0.99,
-        "EUR": 0.99,
-        "GBP": 0.89,
-        "JPY": 120,
-        "AUD": 1.49,
-        "CAD": 1.39,
-        "CHF": 0.99,
-        "AED": 3.69,
-        "SAR": 3.89
-      }
-    },
-    {
-      "sku": "coin.500",
-      "label": "Standart 500 (+50)",
-      "price": "Ã¢â€šÂº99,99",
-      "amount": 99.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 99.99,
-        "USD": 3.49,
-        "EUR": 3.29,
-        "GBP": 2.99,
-        "JPY": 420,
-        "AUD": 4.99,
-        "CAD": 4.49,
-        "CHF": 3.39,
-        "AED": 12.99,
-        "SAR": 13.49
-      }
-    },
-    {
-      "sku": "coin.1200",
-      "label": "BÃƒÂ¼yÃƒÂ¼k 1200 (+200)",
-      "price": "Ã¢â€šÂº199,99",
-      "amount": 199.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 199.99,
-        "USD": 6.99,
-        "EUR": 6.49,
-        "GBP": 5.99,
-        "JPY": 900,
-        "AUD": 9.99,
-        "CAD": 8.99,
-        "CHF": 6.79,
-        "AED": 25.99,
-        "SAR": 26.99
-      }
-    },
-    {
-      "sku": "coin.3000",
-      "label": "Mega 3000 (+600)",
-      "price": "Ã¢â€šÂº399,99",
-      "amount": 399.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 399.99,
-        "USD": 12.99,
-        "EUR": 11.99,
-        "GBP": 10.99,
-        "JPY": 1700,
-        "AUD": 19.99,
-        "CAD": 17.49,
-        "CHF": 12.49,
-        "AED": 47.99,
-        "SAR": 48.99
-      }
-    },
-    {
-      "sku": "coin.7000",
-      "label": "Mystic 7000 (+1000)",
-      "price": "Ã¢â€šÂº699,99",
-      "amount": 699.99,
-      "currency": "TRY",
-      "prices": {
-        "TRY": 699.99,
-        "USD": 22.99,
-        "EUR": 21.99,
-        "GBP": 19.99,
-        "JPY": 3200,
-        "AUD": 34.99
-      }
-    }
-  ]
+﻿{
+    "subscriptions":  [
+                          {
+                              "sku":  "sub.premium.weekly",
+                              "label":  "Haftalık Premium",
+                              "price":  "TL59,99",
+                              "amount":  59.99,
+                              "currency":  "TRY",
+                              "prices":  {
+                                             "TRY":  59.99,
+                                             "USD":  1.99,
+                                             "EUR":  1.79,
+                                             "GBP":  1.59,
+                                             "JPY":  260,
+                                             "AUD":  2.99,
+                                             "CAD":  2.69,
+                                             "CHF":  1.79,
+                                             "AED":  7.29,
+                                             "SAR":  7.49
+                                         },
+                              "desc":  "Reklamsız deneyim + sınırsız fal + 1 özel kart seti deneme"
+                          },
+                          {
+                              "sku":  "sub.premium.monthly",
+                              "label":  "Aylık Premium",
+                              "price":  "TL149,99",
+                              "amount":  149.99,
+                              "currency":  "TRY",
+                              "prices":  {
+                                             "TRY":  149.99,
+                                             "USD":  4.99,
+                                             "EUR":  4.49,
+                                             "GBP":  3.99,
+                                             "JPY":  650,
+                                             "AUD":  7.49,
+                                             "CAD":  6.79,
+                                             "CHF":  4.59,
+                                             "AED":  18.49,
+                                             "SAR":  18.99
+                                         },
+                              "desc":  "Reklamsız + sınırsız fal + özel kart setleri + hızlı yorum önceliği"
+                          },
+                          {
+                              "sku":  "sub.premium.quarterly",
+                              "label":  "3 Aylık Premium",
+                              "price":  "TL399,99",
+                              "amount":  399.99,
+                              "currency":  "TRY",
+                              "prices":  {
+                                             "TRY":  399.99,
+                                             "USD":  12.99,
+                                             "EUR":  11.99,
+                                             "GBP":  10.99,
+                                             "JPY":  1650,
+                                             "AUD":  19.99,
+                                             "CAD":  17.49,
+                                             "CHF":  12.49,
+                                             "AED":  47.99,
+                                             "SAR":  48.99
+                                         },
+                              "desc":  "Reklamsız + sınırsız fal + tüm özel setler + %10 indirim"
+                          },
+                          {
+                              "sku":  "sub.premium.yearly",
+                              "label":  "Yıllık Premium (Elite)",
+                              "price":  "TL999,99",
+                              "amount":  999.99,
+                              "currency":  "TRY",
+                              "prices":  {
+                                             "TRY":  999.99,
+                                             "USD":  34.99,
+                                             "EUR":  32.99,
+                                             "GBP":  29.99,
+                                             "JPY":  4500,
+                                             "AUD":  49.99,
+                                             "CAD":  46.99,
+                                             "CHF":  33.99,
+                                             "AED":  129.99,
+                                             "SAR":  134.99
+                                         },
+                              "desc":  "Reklamsız + sınırsız fal + özel müzik + kişisel avatar + %30 indirim"
+                          },
+                          {
+                              "sku":  "lifetime.mystic_plus",
+                              "label":  "Mystic+ (Ömür Boyu)",
+                              "price":  "TL999,99",
+                              "amount":  1999.99,
+                              "currency":  "TRY",
+                              "prices":  {
+                                             "TRY":  1999.99,
+                                             "USD":  69.99,
+                                             "EUR":  64.99,
+                                             "GBP":  59.99,
+                                             "JPY":  9000,
+                                             "AUD":  99.99,
+                                             "CAD":  91.99,
+                                             "CHF":  66.99,
+                                             "AED":  259.99,
+                                             "SAR":  269.99
+                                         },
+                              "desc":  "Ömür boyu tüm içerikk + AR \u0026 AI"
+                          }
+                      ],
+    "onetime":  [
+                    {
+                        "sku":  "reading.coffee_fast",
+                        "label":  "HÃƒâ€Ã‚Â±zlÃƒâ€Ã‚Â± Kahve FalÃƒâ€Ã‚Â±",
+                        "price":  "ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Âº39,99",
+                        "amount":  39.99,
+                        "currency":  "TRY",
+                        "prices":  {
+                                       "TRY":  39.99,
+                                       "USD":  1.49,
+                                       "EUR":  1.39,
+                                       "GBP":  1.19,
+                                       "JPY":  200,
+                                       "AUD":  2.49
+                                   },
+                        "desc":  "KÃƒâ€Ã‚Â±sa yorum + enerji"
+                    },
+                    {
+                        "sku":  "reading.tarot_deep",
+                        "label":  "Derin Tarot AÃƒÆ’Ã‚Â§Ãƒâ€Ã‚Â±lÃƒâ€Ã‚Â±mÃƒâ€Ã‚Â±",
+                        "price":  "ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Âº79,99",
+                        "amount":  79.99,
+                        "currency":  "TRY",
+                        "prices":  {
+                                       "TRY":  79.99,
+                                       "USD":  2.99,
+                                       "EUR":  2.79,
+                                       "GBP":  2.49,
+                                       "JPY":  400,
+                                       "AUD":  4.49,
+                                       "CAD":  3.99,
+                                       "CHF":  2.89,
+                                       "AED":  10.99,
+                                       "SAR":  11.49
+                                   },
+                        "desc":  "7 kart geÃƒÆ’Ã‚Â§miÃƒâ€¦Ã…Â¸-gelecek analizi"
+                    },
+                    {
+                        "sku":  "reading.love_match",
+                        "label":  "AÃƒâ€¦Ã…Â¸k Uyumu FalÃƒâ€Ã‚Â±",
+                        "price":  "ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Âº89,99",
+                        "amount":  89.99,
+                        "currency":  "TRY",
+                        "prices":  {
+                                       "TRY":  89.99,
+                                       "USD":  3.49,
+                                       "EUR":  3.29,
+                                       "GBP":  2.99,
+                                       "JPY":  450,
+                                       "AUD":  4.99,
+                                       "CAD":  4.49,
+                                       "CHF":  3.39,
+                                       "AED":  12.99,
+                                       "SAR":  13.49
+                                   },
+                        "desc":  "Partner analizi + uyum"
+                    },
+                    {
+                        "sku":  "reading.palm_premium",
+                        "label":  "Haftalık Premium",
+                        "price":  "ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Âº119,99",
+                        "amount":  119.99,
+                        "currency":  "TRY",
+                        "prices":  {
+                                       "TRY":  119.99,
+                                       "USD":  4.49,
+                                       "EUR":  4.29,
+                                       "GBP":  3.79,
+                                       "JPY":  600,
+                                       "AUD":  6.49,
+                                       "CAD":  5.99,
+                                       "CHF":  4.29,
+                                       "AED":  16.49,
+                                       "SAR":  16.99
+                                   },
+                        "desc":  "ÃƒÆ’Ã¢â‚¬Â¡izgi okuma + kader"
+                    },
+                    {
+                        "sku":  "report.annual_2025",
+                        "label":  "Kader HaritasÃƒâ€Ã‚Â± 2025",
+                        "price":  "ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Âº199,99",
+                        "amount":  199.99,
+                        "currency":  "TRY",
+                        "prices":  {
+                                       "TRY":  199.99,
+                                       "USD":  6.99,
+                                       "EUR":  6.49,
+                                       "GBP":  5.99,
+                                       "JPY":  1000,
+                                       "AUD":  9.99,
+                                       "CAD":  8.99,
+                                       "CHF":  6.79,
+                                       "AED":  25.99,
+                                       "SAR":  26.99
+                                   },
+                        "desc":  "YÃƒâ€Ã‚Â±llÃƒâ€Ã‚Â±k astrolojik rapor (PDF)"
+                    },
+                    {
+                        "sku":  "reading.combo_karma",
+                        "label":  "Karma FalÃƒâ€Ã‚Â± (TÃƒÆ’Ã‚Â¼m Set)",
+                        "price":  "TL49,99",
+                        "amount":  249.99,
+                        "currency":  "TRY",
+                        "prices":  {
+                                       "TRY":  249.99,
+                                       "USD":  8.99,
+                                       "EUR":  8.49,
+                                       "GBP":  7.99,
+                                       "JPY":  1300,
+                                       "AUD":  12.99,
+                                       "CAD":  11.99,
+                                       "CHF":  8.99,
+                                       "AED":  32.99,
+                                       "SAR":  34.49
+                                   },
+                        "desc":  "Kahve + Tarot + Enerji"
+                    }
+                ],
+    "coins":  [
+                  {
+                      "sku":  "coin.100",
+                      "label":  "Mini (100)",
+                      "price":  "TL29,99",
+                      "amount":  29.99,
+                      "currency":  "TRY",
+                      "prices":  {
+                                     "TRY":  29.99,
+                                     "USD":  0.99,
+                                     "EUR":  0.99,
+                                     "GBP":  0.89,
+                                     "JPY":  120,
+                                     "AUD":  1.49,
+                                     "CAD":  1.39,
+                                     "CHF":  0.99,
+                                     "AED":  3.69,
+                                     "SAR":  3.89
+                                 }
+                  },
+                  {
+                      "sku":  "coin.500",
+                      "label":  "Standart (500 +50)",
+                      "price":  "TL99,99",
+                      "amount":  99.99,
+                      "currency":  "TRY",
+                      "prices":  {
+                                     "TRY":  99.99,
+                                     "USD":  3.49,
+                                     "EUR":  3.29,
+                                     "GBP":  2.99,
+                                     "JPY":  420,
+                                     "AUD":  4.99,
+                                     "CAD":  4.49,
+                                     "CHF":  3.39,
+                                     "AED":  12.99,
+                                     "SAR":  13.49
+                                 }
+                  },
+                  {
+                      "sku":  "coin.1200",
+                      "label":  "Büyük (1200 +200)",
+                      "price":  "TL199,99",
+                      "amount":  199.99,
+                      "currency":  "TRY",
+                      "prices":  {
+                                     "TRY":  199.99,
+                                     "USD":  6.99,
+                                     "EUR":  6.49,
+                                     "GBP":  5.99,
+                                     "JPY":  900,
+                                     "AUD":  9.99,
+                                     "CAD":  8.99,
+                                     "CHF":  6.79,
+                                     "AED":  25.99,
+                                     "SAR":  26.99
+                                 }
+                  },
+                  {
+                      "sku":  "coin.3000",
+                      "label":  "Mega (3000 +600)",
+                      "price":  "TL399,99",
+                      "amount":  399.99,
+                      "currency":  "TRY",
+                      "prices":  {
+                                     "TRY":  399.99,
+                                     "USD":  12.99,
+                                     "EUR":  11.99,
+                                     "GBP":  10.99,
+                                     "JPY":  1700,
+                                     "AUD":  19.99,
+                                     "CAD":  17.49,
+                                     "CHF":  12.49,
+                                     "AED":  47.99,
+                                     "SAR":  48.99
+                                 }
+                  },
+                  {
+                      "sku":  "coin.7000",
+                      "label":  "Mystic (7000 +1000)",
+                      "price":  "TL699,99",
+                      "amount":  699.99,
+                      "currency":  "TRY",
+                      "prices":  {
+                                     "TRY":  699.99,
+                                     "USD":  22.99,
+                                     "EUR":  21.99,
+                                     "GBP":  19.99,
+                                     "JPY":  3200,
+                                     "AUD":  34.99
+                                 }
+                  }
+              ]
 }

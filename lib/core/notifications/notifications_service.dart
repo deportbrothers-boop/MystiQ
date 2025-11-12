@@ -33,7 +33,7 @@ class NotificationsService {
     final sp = await SharedPreferences.getInstance();
     await sp.setBool(_dailyEnabledKey, enabled);
     if (enabled) {
-      await scheduleDaily(const TimeOfDay(hour: 9, minute: 0));
+      await scheduleDaily(const TimeOfDay(hour: 12, minute: 0));
     } else {
       await _plugin.cancel(1001);
     }
@@ -54,7 +54,7 @@ class NotificationsService {
       await _plugin.zonedSchedule(
         1001,
         'MystiQ',
-        'Bugünün enerjisini keşfet',
+        '\\u{1F319} Evren senin icin bugun ozel bir mesaj gonderdi. Gel ve kesfet.',
         next,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -101,3 +101,5 @@ class NotificationsService {
     return scheduled;
   }
 }
+
+

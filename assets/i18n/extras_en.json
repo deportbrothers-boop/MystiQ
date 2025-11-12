@@ -63,5 +63,15 @@
     "astro.creating":  "Creating...",
     "action.saving":  "Saving...",
     "dream.cta":  "Interpret",
-    "tarot.cta":  "Select and Continue"
+    "tarot.cta":  "Select and Continue",
+    "settings.title":  "Settings",
+    "settings.language":  "Language",
+    "settings.fcm.reset_title":  "Reset notifications",
+    "settings.fcm.reset_sub":  "Re-register if delivery seems broken.",
+    "lang.system":  "System default",
+    "lang.tr":  "Turkish",
+    "lang.en":  "English",
+    "lang.es":  "Spanish",
+    "lang.ar":  "Arabic",
+    "legal.privacy_short":  "Privacy"
 }
