@@ -5,11 +5,11 @@ Klasörler
 - 3.0x:           assets/images/categories/3.0x/
 
 Dosya adları (PNG, 9:14 oran)
-- Kahve Falı      -> coffee.png
+- Kahve Yorumu    -> coffee.png
 - Tarot           -> tarot.png
-- El Falı         -> palm.png
+- El Çizgisi Yorumu -> palm.png
 - Astroloji       -> astro.png
-- Canlı Falcı     -> live.png
+- Canlı Yorumcu   -> live.png
 - Rüya Tabiri     -> dream.png
 
 Boyut önerileri

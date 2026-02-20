@@ -70,22 +70,72 @@ class AppLocalizations {
     return fixed;
   }
 
-  bool _looksBroken(String s) => RegExp(r'[\uFFFD]').hasMatch(s) || s.contains('Ã') || s.contains('Â');
+  bool _looksBroken(String s) =>
+      RegExp(r'[\uFFFDÃÄÅÂâ]').hasMatch(s) || s.contains('Ã') || s.contains('Â');
 
   String _normalizeUtf(String s) {
     if (s.isEmpty) return s;
     var out = s.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
-    try {
-      final reparsed = utf8.decode(latin1.encode(out));
-      if (reparsed.isNotEmpty) out = reparsed;
-    } catch (_) {}
+
+    // Many translation files were saved with a wrong encoding at some point.
+    // Repair common UTF-8-as-Latin1 mojibake.
+    // IMPORTANT: Only attempt latin1->utf8 repair if the string *looks broken*.
+    // Otherwise valid Turkish chars like "ü/ö/ş/ı/ğ" may turn into � and get dropped.
+    if (_looksBroken(out)) {
+      try {
+        final reparsed = utf8.decode(latin1.encode(out), allowMalformed: true);
+        if (reparsed.isNotEmpty && !_looksBroken(reparsed)) {
+          out = reparsed;
+        } else if (reparsed.isNotEmpty) {
+          // Keep reparsed only if it reduces the amount of broken markers.
+          final brokenBefore = RegExp(r'[\uFFFDÃÄÅÂâ]').allMatches(out).length;
+          final brokenAfter = RegExp(r'[\uFFFDÃÄÅÂâ]').allMatches(reparsed).length;
+          if (brokenAfter < brokenBefore) out = reparsed;
+        }
+      } catch (_) {}
+    }
+
     const map = {
-      'Ã§':'ç','Ã¶':'ö','Ã¼':'ü','Ä±':'ı','ÄŸ':'ğ','ÅŸ':'ş',
-      'Ã‡':'Ç','Ã–':'Ö','Ãœ':'Ü','Ä°':'İ','Äž':'Ğ','Åž':'Ş',
-      'â€™':'’','â€˜':'‘','â€œ':'“','â€':'”','â€“':'–','â€”':'—','â€¢':'•',
-      'Â·':'·','Â':'',
+      // Double-encoded -> correct characters
+      'ÃƒÂ§': 'ç', 'ÃƒÂ¶': 'ö', 'ÃƒÂ¼': 'ü', 'Ã„Â±': 'ı', 'Ã„Å¸': 'ğ', 'Ã…Å¸': 'ş',
+      'Ãƒâ€¡': 'Ç', 'Ãƒâ€“': 'Ö', 'ÃƒÅ“': 'Ü', 'Ã„Â°': 'İ', 'Ã„Å¾': 'Ğ', 'Ã…Å¾': 'Ş',
+      'Ã¢â‚¬â„¢': '’', 'Ã¢â‚¬Ëœ': '‘', 'Ã¢â‚¬Å“': '“', 'Ã¢â‚¬Â': '”', 'Ã¢â‚¬â€œ': '–',
+      'Ã¢â‚¬â€': '—', 'Ã¢â‚¬Â¢': '•', 'Ã‚Â·': '·',
+
+      // Single-encoded -> correct characters
+      'Ã§': 'ç', 'Ã¶': 'ö', 'Ã¼': 'ü', 'Ä±': 'ı', 'ÄŸ': 'ğ', 'ÅŸ': 'ş',
+      'Ã‡': 'Ç', 'Ã–': 'Ö', 'Ãœ': 'Ü', 'Ä°': 'İ', 'Äž': 'Ğ', 'Åž': 'Ş',
+      'â€™': '’', 'â€˜': '‘', 'â€œ': '“', 'â€': '”', 'â€“': '–', 'â€”': '—', 'â€¢': '•',
+      'â€‘': '‑',
+
+      // Artifacts
+      'Â': '',
+      'Ã‚': '',
     };
-    map.forEach((k,v){ out = out.replaceAll(k, v); });
+    map.forEach((k, v) {
+      out = out.replaceAll(k, v);
+    });
+
+    // Common UTF-8-as-Latin1 sequences that may still remain after the repair above.
+    // Example: "RÃ¼ya" -> "Rüya", "CÃ¼zdan" -> "Cüzdan"
+    const pairs = {
+      'Ã¼': 'ü',
+      'Ãœ': 'Ü',
+      'Ã¶': 'ö',
+      'Ã–': 'Ö',
+      'Ã§': 'ç',
+      'Ã‡': 'Ç',
+      'Ä±': 'ı',
+      'Ä°': 'İ',
+      'ÄŸ': 'ğ',
+      'Ä': 'Ğ',
+      'ÅŸ': 'ş',
+      'Å': 'Ş',
+    };
+    pairs.forEach((k, v) {
+      out = out.replaceAll(k, v);
+    });
+
     out = out.replaceAll('\uFFFD', '');
     return out;
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'app_router.dart';
@@ -17,34 +18,43 @@ import 'core/ai/ai_service.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 Future<void> main() async {
   await runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    // Don't block first frame for Firebase; initialize with a short timeout, else continue.
-    try {
-      await Firebase.initializeApp().timeout(const Duration(seconds: 1));
-    } catch (e) {
-      debugPrint('Firebase init (deferred): $e');
-      // Try again in background after first frame
-      // ignore: unawaited_futures
-      Future.microtask(() async {
-        try { await Firebase.initializeApp(); } catch (_) {}
-      });
-    }
-    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
     // Log uncaught errors instead of crashing on some devices
     FlutterError.onError = (FlutterErrorDetails details) {
       debugPrint('FlutterError: \n${details.exceptionAsString()}');
     };
+
+    // Don't block first frame for Firebase; initialize with a short timeout, else continue.
+    try {
+      await Firebase.initializeApp().timeout(const Duration(seconds: 1));
+      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    } catch (e) {
+      debugPrint('Firebase init (deferred): $e');
+      // Try again in background after first frame
+      // ignore: unawaited_futures
+      Future.microtask(() async {
+        try {
+          await Firebase.initializeApp();
+          FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+        } catch (_) {}
+      });
+    }
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     AiService.configure();
     // Ask for ad consent if required (EEA/UK). Do not block startup on failure.
     try { await AdConsent.requestIfRequired(); } catch (_) {}
     await AdService.init();
     // Fire-and-forget notifications init
     // ignore: unawaited_futures
-    NotificationsService.init().catchError((e){ debugPrint('Notifications init failed: $e'); });
+    NotificationsService.init()
+        .then((_) => NotificationsService.touchAndScheduleInactivityReminder())
+        .catchError((e){ debugPrint('Notifications init failed: $e'); });
+    // Daily notification, sadece kullanici acarsa NotificationCenter/onboarding tarafindan ayarlanir.
 
     final entitlements = EntitlementsController();
     final history = HistoryController();
@@ -127,7 +137,41 @@ class MystiQApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          builder: (context, child) => child ?? const SizedBox.shrink(),
+          builder: (context, child) {
+            final app = DecoratedBox(
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage('assets/images/bg/bgfal_hub_starry_bg.png'),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: child ?? const SizedBox.shrink(),
+            );
+
+            if (!kDebugMode) return app;
+
+            return Stack(
+              children: [
+                app,
+                Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: SafeArea(
+                    child: FloatingActionButton.extended(
+                      heroTag: 'testCrash',
+                      onPressed: () {
+                        if (kDebugMode) {
+                          throw Exception('Test Crash');
+                        }
+                      },
+                      icon: const Icon(Icons.bug_report),
+                      label: const Text('Test Crash'),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -153,9 +197,18 @@ class _PendingLifecycleHook extends WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // 24 saat açılmazsa hatırlatma bildirimi planla
+      // ignore: unawaited_futures
+      NotificationsService.touchAndScheduleInactivityReminder()
+          .catchError((e){ debugPrint('Inactivity notif schedule failed: $e'); });
       // ignore: unawaited_futures
       PendingReadingsService.checkAndCompleteDue(history: history, profile: profile)
           .catchError((e){ debugPrint('Pending check (resume) failed: $e'); });
+    } else if (state == AppLifecycleState.paused) {
+      // Uygulamadan çıkışta (arka plana alınca) tekrar planla
+      // ignore: unawaited_futures
+      NotificationsService.touchAndScheduleInactivityReminder()
+          .catchError((e){ debugPrint('Inactivity notif schedule failed: $e'); });
     }
     super.didChangeAppLifecycleState(state);
   }

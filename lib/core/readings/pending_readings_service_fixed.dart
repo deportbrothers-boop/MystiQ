@@ -4,12 +4,15 @@ import '../notifications/notifications_service.dart';
 import '../../features/history/history_controller.dart';
 import '../../features/history/history_entry.dart';
 import '../ai/ai_service.dart';
+import '../access/ai_generation_guard.dart';
 import '../analytics/analytics.dart';
 import 'pending_localization.dart';
 import '../../features/profile/profile_controller.dart';
+import '../ai/local_generator.dart';
 
 class PendingReadingsService {
   static const _kKey = 'pending_readings_v1';
+  static const _kSpeedupUsed = 'speedupUsed';
 
   static Future<List<Map<String, dynamic>>> _load() async {
     final sp = await SharedPreferences.getInstance();
@@ -61,6 +64,31 @@ class PendingReadingsService {
     } catch (_) {
       return null;
     }
+  }
+
+  static Future<bool> isSpeedupUsed(String id) async {
+    try {
+      final it = await getById(id);
+      final extras = (it?['extras'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+      return extras[_kSpeedupUsed] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> markSpeedupUsed(String id) async {
+    try {
+      final items = await _load();
+      for (final it in items) {
+        if ((it['id'] as String?) == id) {
+          final extras = (it['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+          extras[_kSpeedupUsed] = true;
+          it['extras'] = extras;
+          break;
+        }
+      }
+      await _save(items);
+    } catch (_) {}
   }
 
   static Future<void> updateReadyAt({
@@ -153,14 +181,40 @@ class PendingReadingsService {
           continue;
         }
         final type = (it['type'] as String?) ?? 'coffee';
-        final extras = (it['extras'] as Map?)?.cast<String, dynamic>();
+        final extras = (it['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+        // Legacy safety: old pending items may not have a permit saved.
+        if ((extras['permit'] ?? '').toString().trim().isEmpty) {
+          try {
+            extras['permit'] = await AiGenerationGuard.issuePermit();
+          } catch (_) {}
+        }
         // Always generate and save when due so result shows both on screen and in history
         String generated;
         try {
           AiService.configure();
           generated = await AiService.generate(type: type, profile: profile.profile, extras: extras, locale: locale);
+        } on AiGenerationGuardException catch (e) {
+          // If the permit was already consumed, assume generation already happened elsewhere (e.g., Result page).
+          if (e.reason == 'permit_already_consumed') {
+            continue;
+          }
+          // Missing permit (shouldn't happen) -> keep pending item.
+          remaining.add(it);
+          continue;
         } catch (_) {
-          generated = 'Uretim su anda yapilamiyor.';
+          generated = '';
+        }
+
+        if (generated.trim().isEmpty || generated.trim().startsWith('Uretim su anda yapilamiyor')) {
+          try {
+            generated = LocalAIGenerator.generate(type: type, profile: profile.profile, extras: extras, locale: locale);
+          } catch (_) {
+            generated = 'Yorum şu an oluşturulamadı; biraz sonra tekrar deneyebilirsin.\n\nBu içerik eğlence amaçlıdır; kesinlik içermez.';
+          }
+        }
+
+        if (type == 'coffee') {
+          generated = AiService.postProcessCoffeeText(generated);
         }
         final entry = HistoryEntry(
           id: it['id'] as String,

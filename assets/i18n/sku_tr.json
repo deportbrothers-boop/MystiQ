@@ -1,13 +1,13 @@
 ﻿{
-  "sku.sub.premium.weekly.label": "HaftalÄ±k Premium",
-  "sku.sub.premium.weekly.desc": "HaftalÄ±k reklamsÄ±z + sÄ±nÄ±rsÄ±z fal",
-  "sku.sub.premium.monthly.label": "AylÄ±k Premium",
-  "sku.sub.premium.monthly.desc": "ReklamsÄ±z deneyim, sÄ±nÄ±rsÄ±z fal ve Ã¶zel kart setleri",
-  "sku.sub.premium.quarterly.label": "3 AylÄ±k Premium",
+  "sku.sub.premium.weekly.label": "Haftalık Premium",
+  "sku.sub.premium.weekly.desc": "Haftalık reklamsız + sınırsız kahve yorumu",
+  "sku.sub.premium.monthly.label": "Aylık Premium",
+  "sku.sub.premium.monthly.desc": "Reklamsız deneyim, sınırsız kahve yorumu ve özel kart setleri",
+  "sku.sub.premium.quarterly.label": "3 Aylık Premium",
   "sku.sub.premium.quarterly.desc": "%10 indirimli paket",
-  "sku.sub.premium.yearly.label": "YÄ±llÄ±k Premium",
+  "sku.sub.premium.yearly.label": "Yıllık Premium",
   "sku.sub.premium.yearly.desc": "%35 indirim",
-  "sku.lifetime.mystic_plus.label": "Mystic+ (Ã–mÃ¼r Boyu)",
-  "sku.lifetime.mystic_plus.desc": "Ã–mÃ¼r boyu tÃ¼m iÃ§erik + AR ve AI"
+  "sku.lifetime.mystic_plus.label": "Mystic+ (Ömür Boyu)",
+  "sku.lifetime.mystic_plus.desc": "Ömür boyu tüm içerik + AR ve AI"
 }
 

@@ -1,9 +1,11 @@
 class SkuCosts {
-  static const coffeeFast = 100; // coins
-  static const tarotDeep = 200;
-  static const palmPremium = 300;
+  // Coin maliyetleri (reklam izleyerek coin kazanılır; gerçek para ile satın alma yok)
+  static const coffeeFast = 20; // Kahve Yorumu
+  static const tarotDeep = 20; // Tarot
+  static const palmPremium = 20; // El Çizgisi Yorumu
   static const loveMatch = 250;
   static const comboKarma = 400;
-  static const dream = 150;
-  static const astro = 180;
+  static const dream = 20; // Rüya Tabiri
+  static const astro = 20; // Astroloji
+  static const motivation = 20; // Günlük Motivasyon
 }

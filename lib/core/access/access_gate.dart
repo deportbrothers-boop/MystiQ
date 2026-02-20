@@ -47,23 +47,16 @@ class AccessGate {
               const SizedBox(height: 8),
               Text(AppLocalizations.of(context).t('access.paywall.prompt')),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () { Navigator.pop(context); context.push('/paywall'); },
-                      child: Text(AppLocalizations.of(context).t('access.buy_coins')),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () { Navigator.pop(context); context.push('/paywall'); },
-                      child: Text(AppLocalizations.of(context).t('access.go_premium')),
-                    ),
-                  ),
-                ],
-              )
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push('/paywall');
+                  },
+                  child: Text(AppLocalizations.of(context).t('access.buy_coins')),
+                ),
+              ),
             ],
           ),
         ),

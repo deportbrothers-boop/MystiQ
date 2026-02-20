@@ -7,11 +7,13 @@ import 'package:provider/provider.dart';
 import '../../../common/widgets/mystiq_background.dart';
 import '../../../common/widgets/scanning_overlay.dart';
 import '../../../core/access/access_gate.dart';
+import '../../../core/access/ai_generation_guard.dart';
 import '../../../core/access/sku_costs.dart';
 import '../../../core/ads/rewarded_helper.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/entitlements/entitlements_controller.dart';
 import '../../../core/i18n/app_localizations.dart';
+import '../../../core/readings/coffee_image_inspector.dart';
 import '../../../core/readings/pending_readings_service_fixed.dart';
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
@@ -32,8 +34,10 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
   String? _scheduledId;
   Duration? _eta; // last selected ETA (10m or 5m)
   bool _adUsed = false;
+  String? _permit;
   String _topic = 'general';
   String _style = 'practical'; // 'practical' | 'spiritual' | 'analytical'
+  static const Duration _defaultEta = Duration(minutes: 10);
 
   @override
   void initState() {
@@ -47,14 +51,17 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
         if (!mounted || item == null) return;
         final readyAt = DateTime.tryParse((item['readyAt'] as String?) ?? '');
         if (readyAt == null) return;
+        final pendingId = item['id']?.toString();
         final extras = (item['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
         final paths = (extras['imagePaths'] as List?)?.map((e) => '$e').toList() ?? const <String>[];
         if (!mounted) return;
         context.push('/reading/result/coffee', extra: {
           if (paths.isNotEmpty) 'imagePaths': paths,
+          if ((extras['permit'] ?? '').toString().trim().isNotEmpty) 'permit': extras['permit'],
           'etaSeconds': readyAt.difference(DateTime.now()).inSeconds.clamp(0, 86400),
           'readyAt': readyAt.toIso8601String(),
           'generateAtReady': true,
+          if (pendingId != null && pendingId.isNotEmpty) 'pendingId': pendingId,
           // streaming/local flags removed
         });
       } catch (_) {}
@@ -67,7 +74,7 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  Future<void> _startReading({bool forceAd = false}) async {
+  Future<void> _startReading({required bool viaAd}) async {
     final selectedCount = [cup1, cup2, saucer].where((e) => e != null).length;
     if (selectedCount == 0) {
       final loc = AppLocalizations.of(context);
@@ -77,34 +84,63 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
       return;
     }
 
+    // Boş fincan/iz yoksa: kesinlikle yorum üretme.
+    try {
+      String? emptyLabel;
+      if (cup1 != null) {
+        final r = await CoffeeImageInspector.looksEmpty(cup1!.path);
+        if (r == true) emptyLabel = 'Fincan 1';
+      }
+      if (emptyLabel == null && cup2 != null) {
+        final r = await CoffeeImageInspector.looksEmpty(cup2!.path);
+        if (r == true) emptyLabel = 'Fincan 2';
+      }
+      if (emptyLabel == null && saucer != null) {
+        final r = await CoffeeImageInspector.looksEmpty(saucer!.path);
+        if (r == true) emptyLabel = 'Tabak';
+      }
+      if (!mounted) return;
+      if (emptyLabel != null) {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Bilgilendirme'),
+            content: Text(
+              '$emptyLabel görselinde henüz yorumlanabilecek izler oluşmamış.\n\n'
+              'Kahve içildikten sonra telve fincanın içinde iz bıraktığında daha sağlıklı bir yorum yapabiliriz.\n\n'
+              'Hazır olduğunda fincanını tekrar gönderebilirsin.',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Tamam')),
+            ],
+          ),
+        );
+        return;
+      }
+    } catch (_) {}
+
     await Analytics.log('reading_started', {'type': 'coffee'});
     if (!mounted) return;
 
-    // Coins-only gate: reklam yolunda atla, normal akışta uygula
-    if (!forceAd) {
-      final okCoins = await AccessGate.ensureCoinsOnlyOrPaywall(
-        context,
-        coinCost: SkuCosts.coffeeFast,
-      );
-      if (!okCoins || !mounted) return;
-    }
-
-    // ETA: varsayılan 10dk. İlk reklam hızlandırmaz; sadece hak tanır.
-    Duration eta = const Duration(minutes: 10);
+    // Akışlar:
+    // - Reklam ile: 2 reklam + 10 dk bekleme
+    // - Coin ile: beklemeden (0 dk) doğrudan üretim
+    Duration eta = _defaultEta;
     bool adUsed = false;
-    if (forceAd) {
+
+    if (viaAd) {
       try {
-        final ok = await RewardedAds.show(context: context);
+        final ok = await RewardedAds.showMultiple(context: context, count: 2, key: 'coffee');
         if (!mounted) return;
         if (ok) {
           adUsed = true;
-          try { await RewardedAds.recordOne(); } catch (_) {}
-          // İlk reklamdan sonra bekleme 10 dk kalır; hızlandırma sonuç ekranında yapılır.
+          _permit = await AiGenerationGuard.issuePermit();
+          // Reklamdan sonra bekleme 10 dk kalır.
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(
               AppLocalizations.of(context).t('coffee.entry.ad_ok') != 'coffee.entry.ad_ok'
                   ? AppLocalizations.of(context).t('coffee.entry.ad_ok')
-                  : 'Reklam izlendi. Sonuç yaklaşık 10 dk içinde hazır. Hızlandırmak için sonuç ekranında reklam izleyebilirsiniz.'
+                  : '2 reklam izlendi. Sonuç yaklaşık 10 dk içinde hazır.'
             )),
           );
         } else {
@@ -112,70 +148,62 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
             SnackBar(content: Text(
               AppLocalizations.of(context).t('coffee.fast.ad_failed') != 'coffee.fast.ad_failed'
                   ? AppLocalizations.of(context).t('coffee.fast.ad_failed')
-                  : 'Reklam gosterilemedi. Normal hizda devam ediliyor (10 dk).'
+                  : 'Reklam gosterilemedi. Tekrar deneyin.'
             )),
           );
+          return;
         }
       } catch (_) {}
     } else {
-      // Coins path: no waiting
+      // Coin path: no waiting (coin, gerçek para değil)
+      final ok = await AccessGate.ensureCoinsOnlyOrPaywall(
+        context,
+        coinCost: SkuCosts.coffeeFast,
+      );
+      if (!ok || !mounted) return;
+      _permit = await AiGenerationGuard.issuePermit();
       eta = Duration.zero;
     }
 
     if (eta > Duration.zero) {
       try {
-      final readyAt = DateTime.now().add(eta);
-      final extras = <String, dynamic>{
-        'typeHint': 'coffee',
-        if (cup1 != null || cup2 != null || saucer != null)
-          'imagePaths': [
-            if (cup1 != null) cup1!.path,
-            if (cup2 != null) cup2!.path,
-            if (saucer != null) saucer!.path,
-          ],
-        // Generate and save to history even if user leaves the page
-        'topic': _topic,
-        'style': _style,
-        if (adUsed) 'adBoost': true,
-        // streaming/local flags removed
-      };
-      final locale = Localizations.localeOf(context).languageCode;
-      final id = await PendingReadingsService.schedule(type: 'coffee', readyAt: readyAt, extras: extras, locale: locale);
-      _scheduledId = id;
-      // Add placeholder to History: "Hazırlanıyor"
-      try {
-        final hc = context.read<HistoryController>();
-        final title = AppLocalizations.of(context).t('coffee.title');
-        final preparing = AppLocalizations.of(context).t('reading.preparing');
-        await hc.upsert(HistoryEntry(
-          id: id,
-          type: 'coffee',
-          title: title,
-          text: preparing,
-          createdAt: DateTime.now(),
-        ));
+        final readyAt = DateTime.now().add(eta);
+        final extras = <String, dynamic>{
+          'typeHint': 'coffee',
+          if (cup1 != null || cup2 != null || saucer != null)
+            'imagePaths': [
+              if (cup1 != null) cup1!.path,
+              if (cup2 != null) cup2!.path,
+              if (saucer != null) saucer!.path,
+            ],
+          // Generate and save to history even if user leaves the page
+          'topic': _topic,
+          'style': _style,
+          if ((_permit ?? '').trim().isNotEmpty) 'permit': _permit,
+          if (adUsed) 'adBoost': true,
+          // streaming/local flags removed
+        };
+        final locale = Localizations.localeOf(context).languageCode;
+        final id = await PendingReadingsService.schedule(type: 'coffee', readyAt: readyAt, extras: extras, locale: locale);
+        _scheduledId = id;
+        // Add placeholder to History: "Hazırlanıyor"
+        try {
+          final hc = context.read<HistoryController>();
+          final title = AppLocalizations.of(context).t('coffee.title');
+          final preparing = AppLocalizations.of(context).t('reading.preparing');
+          await hc.upsert(HistoryEntry(
+            id: id,
+            type: 'coffee',
+            title: title,
+            text: preparing,
+            createdAt: DateTime.now(),
+          ));
+        } catch (_) {}
       } catch (_) {}
-    } catch (_) {}
     }
-    if (eta > Duration.zero) {
-      setState(() { scanning = true; _eta = eta; _adUsed = adUsed; });
-    } else {
-      // Immediate navigation for coin flow
-      final paths = <String>[
-        if (cup1 != null) cup1!.path,
-        if (cup2 != null) cup2!.path,
-        if (saucer != null) saucer!.path,
-      ];
-      if (!mounted) return;
-      context.push('/reading/result/coffee', extra: {
-        'typeHint': 'coffee',
-        if (paths.isNotEmpty) 'imagePath': paths.first,
-        if (paths.isNotEmpty) 'imagePaths': paths,
-        'topic': _topic,
-        'style': _style,
-        // streaming/local flags removed
-      });
-    }
+
+    // Her iki akışta da "gönderme" hissi için scanning overlay gösterelim.
+    setState(() { scanning = true; _eta = eta; _adUsed = adUsed; });
   }
 
   Future<void> _pickFor(String slot, ImageSource source) async {
@@ -264,6 +292,9 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
     return Scaffold(
+      // Kahve yorumu ekranında global yıldızlı arka planı gizle,
+      // sadece eski coffee_premium_bg arka planını göster.
+      backgroundColor: const Color(0xFF080311),
       extendBodyBehindAppBar: true,
       appBar: AppBar(title: Text(loc.t('coffee.title'))),
       bottomNavigationBar: SafeArea(
@@ -329,42 +360,29 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
-              Row(
+          const SizedBox(height: 10),
+              Column(
                 children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                      side: BorderSide.none,
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.play_circle_outline, size: 18),
+                      onPressed: () async { await _startReading(viaAd: true); },
+                      label: Text(
+                        AppLocalizations.of(context).t('coffee.entry.watch_and_read') != 'coffee.entry.watch_and_read'
+                            ? AppLocalizations.of(context).t('coffee.entry.watch_and_read')
+                            : '2 Reklam izle, Yorum Al',
+                      ),
                     ),
-                    icon: const Icon(Icons.play_circle_outline, size: 18),
-                    label: Text(
-                      AppLocalizations.of(context).t('coffee.entry.watch_and_read') != 'coffee.entry.watch_and_read'
-                          ? AppLocalizations.of(context).t('coffee.entry.watch_and_read')
-                          : 'Reklam izle, Fal Bak',
-                    ),
-                    onPressed: () async { await _startReading(forceAd: true); },
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async { await _startReading(); },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(loc.t('coffee.cta') != 'coffee.cta' ? loc.t('coffee.cta') : 'Fal Bak'),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.monetization_on_outlined, size: 16),
-                          const SizedBox(width: 2),
-                          Text('${SkuCosts.coffeeFast}'),
-                          const SizedBox(width: 6),
-                          Tooltip(
-                            message: (loc.t('coins.reason.coffee') != 'coins.reason.coffee')
-                                ? loc.t('coins.reason.coffee')
-                                : 'Goruntu analizi ve AI uretimi coin gerektirir.',
-                            child: const Icon(Icons.info_outline, size: 16),
-                          )
-                        ],
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.monetization_on_outlined, size: 18),
+                      onPressed: () async { await _startReading(viaAd: false); },
+                      label: Consumer<EntitlementsController>(
+                        builder: (_, ent, __) => Text('Coin ile Yorum Al (${SkuCosts.coffeeFast} coin) • Mevcut: ${ent.coins}'),
                       ),
                     ),
                   ),
@@ -387,17 +405,23 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
                     if (cup2 != null) cup2!.path,
                     if (saucer != null) saucer!.path,
                   ];
-                  context.push('/reading/result/coffee', extra: {
+                  final eta = _eta ?? _defaultEta;
+                  final extra = <String, dynamic>{
                     if (paths.isNotEmpty) 'imagePath': paths.first,
                     if (paths.isNotEmpty) 'imagePaths': paths,
-                    // Always show countdown (10 dk veya reklam ile 5 dk)
-                    'etaSeconds': (_eta ?? const Duration(minutes: 10)).inSeconds,
-                    'readyAt': DateTime.now().add(_eta ?? const Duration(minutes: 10)).toIso8601String(),
-                    'generateAtReady': true,
                     'topic': _topic,
                     'style': _style,
-                    if (_scheduledId != null) 'pendingId': _scheduledId,
-                  });
+                    if ((_permit ?? '').trim().isNotEmpty) 'permit': _permit,
+                  };
+                  if (eta > Duration.zero) {
+                    extra.addAll({
+                      'etaSeconds': eta.inSeconds,
+                      'readyAt': DateTime.now().add(eta).toIso8601String(),
+                      'generateAtReady': true,
+                      if (_scheduledId != null) 'pendingId': _scheduledId,
+                    });
+                  }
+                  context.push('/reading/result/coffee', extra: extra);
                 },
               )
           ],

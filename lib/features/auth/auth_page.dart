@@ -48,15 +48,6 @@ class _AuthPageState extends State<AuthPage> {
     _goToProfileEdit();
   }
 
-  Future<void> _continuePhone() async {
-    setState(() => _error = null);
-    if (!_accepted) {
-      setState(() => _error = AppLocalizations.of(context).t('error.accept_terms'));
-      return;
-    }
-    _goToProfileEdit();
-  }
-
   Future<void> _pickFromGallery() async {
     final pc = context.read<ProfileController>();
     final x = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 2048);

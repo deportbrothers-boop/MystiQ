@@ -23,11 +23,19 @@ function sendJson(res, status, obj) {
 function fallbackText(body = {}) {
   const type = body.type || 'coffee';
   const name = body?.profile?.name || 'Sevgili ruh';
-  if (type === 'coffee') return `${name}, fincanda beliren kıvrımlar yeni bir döngüyü haber veriyor. İç sesini dinle.`;
-  if (type === 'tarot') return `${name}, kartların dili sabır ve net niyeti fısıldıyor. Küçük bir adım, büyük bir kapıyı açabilir.`;
-  if (type === 'palm') return `${name}, çizgilerin kararlı bir yoldan söz ediyor. Emeklerin görünür olacak.`;
-  if (type === 'dream') return `${name}, rüyanın sembolleri iç denge ve temizlik çağrısı yapıyor.`;
-  return `${name}, yıldızların dansı bugün kalbini yumuşatmaya destekliyor.`;
+  if (type === 'coffee') {
+    return `${name}, fincanda gorunen kavisler bir dongu izlenimi veriyor. Bu, ic dunyanda yeniden duzen ihtiyacini cagristiriyor.`;
+  }
+  if (type === 'tarot') {
+    return `${name}, kartlarin dili sabir ve niyet vurgusu tasiyor. Bu, kucuk ama net bir adim temasini sembolik olarak cagristiriyor.`;
+  }
+  if (type === 'palm') {
+    return `${name}, cizgilerde kararlilik ve odak temasi belirginlesiyor. Bu, emeklerine nazik bir deger verme hissini cagristiriyor.`;
+  }
+  if (type === 'dream') {
+    return `${name}, ruyandaki semboller ic denge ve arinma temasini cagristiriyor.`;
+  }
+  return `${name}, yildizlarin ritmi bugun icinde sakin bir odak hissi uyandiriyor.`;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -78,7 +86,7 @@ const server = http.createServer(async (req, res) => {
             'Access-Control-Allow-Methods': 'POST,OPTIONS',
             'X-Accel-Buffering': 'no',
           });
-          res.write('data: Bir akış hatası oluştu.\n\n');
+          res.write('data: Bir ag hatasi olustu.\n\n');
           return res.end();
         } catch (_) {
           return sendJson(res, 200, { ok: true, source: 'error-fallback', text: fallbackText() });
@@ -100,16 +108,21 @@ const server = http.createServer(async (req, res) => {
         }
 
         const { type = 'coffee', locale = 'tr', profile = {}, inputs = {} } = body;
+        const coffeeSystem =
+          ' Sen bir kahve sembolu yorumlayicisisin. Gelecek hakkinda tahmin yapma. Tarih verme. Kesinlik iddiasinda bulunma. ' +
+          'Yorumlarini yalnizca fincandaki sekillerin sembolik ve eglence amacli cagrisimlarina dayandir. "Olacak" yerine "gibi", "hissi", "cagristiriyor" kullan. ' +
+          'Cikti kurallari: Baslik "Kahve Yorumu"; 4-5 kisa paragraf; 900-1500 karakter; ' +
+          '"Bugunun Mini Onerileri:" altinda 2 satir (- sosyal, - icssel); ' +
+          'en altta "Bu icerik eglence amaclidir; kesinlik icermez." ve sonda geri-cagirma CTA yaz.';
+        const systemBase =
+          'You are MystiQ, a warm, mystical advisor. Keep tone gentle, inspiring, and safe. 240-380 words (unless specified). Entertainment only; avoid health/financial/legal claims.';
+        const system = type === 'coffee' ? `${systemBase}${coffeeSystem}` : systemBase;
 
         const messages = [
-          {
-            role: 'system',
-            content:
-              'You are MystiQ, a warm, mystical advisor. Keep tone gentle, inspiring, and safe. 240-380 words (unless specified). Entertainment only; avoid health/financial/legal claims.',
-          },
+          { role: 'system', content: system },
           {
             role: 'user',
-            content: `Type: ${type}\nLocale: ${locale}\nProfile: ${JSON.stringify(profile)}\nInstruction: Generate a cohesive, symbolic reading with a short title + 3 short paragraphs + a closing affirmation.`,
+            content: `Type: ${type}\nLocale: ${locale}\nUserName: ${(profile?.name || '').toString()}\nInstruction: Kahve yorumu icin kurallara birebir uy; uzun ve akici yaz.`,
           },
         ];
 
@@ -126,7 +139,11 @@ const server = http.createServer(async (req, res) => {
           messages.push({ role: 'user', content: `User text: ${inputs.text}` });
         }
         if (type === 'tarot') {
-          messages.push({ role: 'user', content: 'For TAROT: extend more (320-500 words). Add card symbolism and a past–present–future thread with practical, kind suggestions; consider multiple selected cards if provided.' });
+          messages.push({
+            role: 'user',
+            content:
+              'For TAROT: extend more (320-500 words). Add card symbolism and a theme-focus-reflection thread with practical, kind suggestions; consider multiple selected cards if provided.',
+          });
         }
 
         // Requires Node 18+ for global fetch

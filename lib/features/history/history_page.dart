@@ -8,8 +8,6 @@ import 'history_controller.dart';
 import 'history_entry.dart';
 import '../../core/readings/pending_readings_service_fixed.dart';
 import '../profile/profile_controller.dart';
-import '../../core/ads/rewarded_helper.dart';
-import '../../core/analytics/analytics.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -118,64 +116,25 @@ class _HistoryCard extends StatelessWidget {
           if (entry.type == 'coffee') {
             try {
               final item = await PendingReadingsService.firstPendingOfType('coffee');
+              // Sadece bu entry ile ilişkili pending için hızlandırma akışına gir.
+              if ((item?['id'] as String?) != entry.id) {
+                context.push('/reading/result/${entry.type}', extra: entry);
+                return;
+              }
               final raStr = (item?['readyAt'] as String?) ?? '';
               final readyAt = DateTime.tryParse(raStr);
               if (readyAt != null && readyAt.isAfter(DateTime.now())) {
-                final choice = await showModalBottomSheet<String>(
-                  context: context,
-                  showDragHandle: true,
-                  backgroundColor: const Color(0xFF121018),
-                  builder: (_) => SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(AppLocalizations.of(context).t('coffee.fast.offer.title') != 'coffee.fast.offer.title'
-                              ? AppLocalizations.of(context).t('coffee.fast.offer.title')
-                              : 'Daha hızlı sonuç ister misiniz?',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(AppLocalizations.of(context).t('coffee.fast.offer.desc') != 'coffee.fast.offer.desc'
-                              ? AppLocalizations.of(context).t('coffee.fast.offer.desc')
-                              : 'Reklam izlerseniz kahve falınız 10 dk yerine 5 dk içinde hazır olur.'),
-                          const SizedBox(height: 14),
-                          Row(children: [
-                            Expanded(child: ElevatedButton.icon(icon: const Icon(Icons.rocket_launch, size: 18), onPressed: () => Navigator.pop(context, 'ad'), label: Text(AppLocalizations.of(context).t('coffee.fast.watch_ad') != 'coffee.fast.watch_ad' ? AppLocalizations.of(context).t('coffee.fast.watch_ad') : 'Reklam izle (5 dk)'))),
-                            const SizedBox(width: 10),
-                            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, 'normal'), child: Text(AppLocalizations.of(context).t('coffee.fast.normal') != 'coffee.fast.normal' ? AppLocalizations.of(context).t('coffee.fast.normal') : 'Normal (10 dk)'))),
-                          ])
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-                var eta = readyAt.difference(DateTime.now());
-                if (choice == 'ad') {
-                  final ok = await RewardedAds.show(context: context);
-                  if (ok) {
-                    eta = const Duration(minutes: 5);
-                    try {
-                      final newReady = DateTime.now().add(eta);
-                      final id = item?['id'] as String?;
-                      if (id != null) {
-                        await PendingReadingsService.updateReadyAt(id: id, type: 'coffee', readyAt: newReady, locale: Localizations.localeOf(context).languageCode);
-                      }
-                    } catch (_) {}
-                    try { await RewardedAds.recordOne(); } catch (_) {}
-                    try { await Analytics.log('history_speedup_choice', {'type': 'coffee', 'choice': 'ad', 'ok': true}); } catch (_) {}
-                  }
-                } else {
-                  try { await Analytics.log('history_speedup_choice', {'type': 'coffee', 'choice': 'normal'}); } catch (_) {}
-                }
+                final id = item?['id'] as String?;
+                final extras0 = (item?['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+                final eta0 = readyAt.difference(DateTime.now());
                 if (!context.mounted) return;
                 context.push('/reading/result/coffee', extra: {
-                  'etaSeconds': eta.inSeconds.clamp(0, 86400),
-                  'readyAt': DateTime.now().add(eta).toIso8601String(),
+                  if ((extras0['imagePaths'] is List)) 'imagePaths': (extras0['imagePaths'] as List),
+                  if ((extras0['permit'] ?? '').toString().trim().isNotEmpty) 'permit': extras0['permit'],
+                  'etaSeconds': eta0.inSeconds.clamp(0, 86400),
+                  'readyAt': readyAt.toIso8601String(),
                   'generateAtReady': true,
-                  if ((item?['id'] as String?) != null) 'pendingId': item?['id'],
+                  if (id != null) 'pendingId': id,
                 });
                 return;
               }
@@ -183,69 +142,31 @@ class _HistoryCard extends StatelessWidget {
           } else if (entry.type == 'tarot') {
             try {
               final item = await PendingReadingsService.firstPendingOfType('tarot');
+              // Sadece bu entry ile ilişkili pending için hızlandırma akışına gir.
+              if ((item?['id'] as String?) != entry.id) {
+                context.push('/reading/result/${entry.type}', extra: entry);
+                return;
+              }
               final raStr = (item?['readyAt'] as String?) ?? '';
               final readyAt = DateTime.tryParse(raStr);
               if (readyAt != null && readyAt.isAfter(DateTime.now())) {
-                final choice = await showModalBottomSheet<String>(
-                  context: context,
-                  showDragHandle: true,
-                  backgroundColor: const Color(0xFF121018),
-                  builder: (_) => SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(AppLocalizations.of(context).t('tarot.fast.offer.title') != 'tarot.fast.offer.title'
-                              ? AppLocalizations.of(context).t('tarot.fast.offer.title')
-                              : 'Daha hizli olsun mu?',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(AppLocalizations.of(context).t('tarot.fast.offer.body') != 'tarot.fast.offer.body'
-                              ? AppLocalizations.of(context).t('tarot.fast.offer.body')
-                              : 'Reklam izlerseniz 10 dk yerine 5 dk olur.'),
-                          const SizedBox(height: 14),
-                          Row(children: [
-                            Expanded(child: ElevatedButton.icon(icon: const Icon(Icons.rocket_launch, size: 18), onPressed: () => Navigator.pop(context, 'ad'), label: Text(AppLocalizations.of(context).t('tarot.fast.watch_ad') != 'tarot.fast.watch_ad' ? AppLocalizations.of(context).t('tarot.fast.watch_ad') : 'Reklam izle (5 dk)'))),
-                            const SizedBox(width: 10),
-                            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context, 'normal'), child: Text(AppLocalizations.of(context).t('tarot.fast.normal') != 'tarot.fast.normal' ? AppLocalizations.of(context).t('tarot.fast.normal') : 'Normal (10 dk)'))),
-                          ])
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-                var eta = readyAt.difference(DateTime.now());
-                if (choice == 'ad') {
-                  final ok = await RewardedAds.show(context: context);
-                  if (ok) {
-                    eta = const Duration(minutes: 5);
-                    // Persist new readyAt to pending store so re-entry shows correct time
-                    try {
-                      final newReady = DateTime.now().add(eta);
-                      final id = item?['id'] as String?;
-                      if (id != null) {
-                        await PendingReadingsService.updateReadyAt(id: id, type: 'coffee', readyAt: newReady, locale: Localizations.localeOf(context).languageCode);
-                      }
-                    } catch (_) {}
-                    try { await RewardedAds.recordOne(); } catch (_) {}
-                    try { await Analytics.log('history_speedup_choice', {'type': 'tarot', 'choice': 'ad', 'ok': true}); } catch (_) {}
-                  }
-                } else {
-                  try { await Analytics.log('history_speedup_choice', {'type': 'tarot', 'choice': 'normal'}); } catch (_) {}
+                final id = item?['id'] as String?;
+                if (id == null) {
+                  context.push('/reading/result/${entry.type}', extra: entry);
+                  return;
                 }
-                final extras = (item?['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+                final extras0 = (item?['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+                final eta0 = readyAt.difference(DateTime.now());
                 if (!context.mounted) return;
                 context.push('/reading/result/tarot', extra: {
-                  if ((extras['cards'] is List)) 'cards': (extras['cards'] as List),
-                  if ((extras['cardIndices'] is List)) 'cardIndices': (extras['cardIndices'] as List),
-                  if ((extras['reversed'] is List)) 'reversed': (extras['reversed'] as List),
-                  'etaSeconds': eta.inSeconds.clamp(0, 86400),
-                  'readyAt': DateTime.now().add(eta).toIso8601String(),
+                  if ((extras0['cards'] is List)) 'cards': (extras0['cards'] as List),
+                  if ((extras0['cardIndices'] is List)) 'cardIndices': (extras0['cardIndices'] as List),
+                  if ((extras0['reversed'] is List)) 'reversed': (extras0['reversed'] as List),
+                  if ((extras0['permit'] ?? '').toString().trim().isNotEmpty) 'permit': extras0['permit'],
+                  'etaSeconds': eta0.inSeconds.clamp(0, 86400),
+                  'readyAt': readyAt.toIso8601String(),
                   'generateAtReady': true,
-                  if ((item?['id'] as String?) != null) 'pendingId': item?['id'],
+                  'pendingId': id,
                 });
                 return;
               }

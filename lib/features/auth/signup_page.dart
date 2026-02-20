@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/i18n/app_localizations.dart';
 import '../../core/entitlements/entitlements_controller.dart';
 import '../legal/legal_pages.dart';
 
@@ -72,7 +71,7 @@ class _SignUpPageState extends State<SignUpPage> {
       return;
     }
     if (!_validPassword || _password.text != _confirm.text) {
-      setState(() => _error = 'Sifre en az 8 karakter, harf ve rakam icermeli; Sifreler eslesmeli.');
+      setState(() => _error = 'Şifre en az 8 karakter, harf ve rakam içermeli; şifreler eşleşmeli.');
       return;
     }
     if (!_accepted) {
@@ -135,7 +134,7 @@ class _SignUpPageState extends State<SignUpPage> {
       if (!mounted) return;
       context.replace('/profile/edit');
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Kayit basarisiz.');
+      setState(() => _error = e.message ?? 'Kayıt başarısız.');
     } catch (e) {
       setState(() => _error = 'Beklenmeyen bir hata: $e');
     } finally {
@@ -155,11 +154,11 @@ class _SignUpPageState extends State<SignUpPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Sozlesmeler', style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text('Sözleşmeler', style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
               ListTile(
                 leading: const Icon(Icons.description_outlined),
-                title: const Text('Kullanim Kosullari'),
+                title: const Text('Kullanım Koşulları'),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.of(context).push(MaterialPageRoute(builder: (_) => TermsPage()));
@@ -182,9 +181,8 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Kayit Ol')),
+      appBar: AppBar(title: const Text('Kayıt Ol')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -207,7 +205,7 @@ class _SignUpPageState extends State<SignUpPage> {
             TextField(
               controller: _password,
               decoration: InputDecoration(
-                labelText: 'Sifre',
+                labelText: 'Şifre',
                 suffixIcon: IconButton(
                   icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
                   onPressed: () => setState(() => _showPassword = !_showPassword),
@@ -222,7 +220,7 @@ class _SignUpPageState extends State<SignUpPage> {
             TextField(
               controller: _confirm,
               decoration: InputDecoration(
-                labelText: 'Sifre (tekrar)',
+                labelText: 'Şifre (tekrar)',
                 suffixIcon: IconButton(
                   icon: Icon(_showConfirm ? Icons.visibility_off : Icons.visibility),
                   onPressed: () => setState(() => _showConfirm = !_showConfirm),
@@ -237,7 +235,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 child: GestureDetector(
                   onTap: _openLegalSheet,
                   child: const Text(
-                    'Devam ederek Gizlilik ve Kullanim Kosullari\'ni kabul edersiniz. \n(Detay icin tiklayin)',
+                    'Devam ederek Gizlilik ve Kullanım Koşulları\'nı kabul edersiniz. \n(Detay için tıklayın)',
                     style: TextStyle(color: Colors.white70, decoration: TextDecoration.underline),
                   ),
                 ),
@@ -251,7 +249,7 @@ class _SignUpPageState extends State<SignUpPage> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _busy ? null : _create,
-                child: const Text('Kayit Ol'),
+                child: const Text('Kayıt Ol'),
               ),
             ),
           ],

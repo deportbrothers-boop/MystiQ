@@ -2,6 +2,7 @@
     id("com.android.application")
     id("kotlin-android")
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -35,22 +36,25 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // AdMob App ID placeholder (Google sample test App ID by default)
+        // AdMob App ID placeholder
         manifestPlaceholders["ADMOB_APP_ID"] = (System.getenv("ADMOB_APP_ID")
             ?: "ca-app-pub-4678612524495888~7606654160")
     }
 
-    // Load release keystore config if android/key.properties exists
+    // Release signing: load from android/key.properties (do NOT fall back to debug signing)
     val keystorePropertiesFile = rootProject.file("key.properties")
     val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
         FileInputStream(keystorePropertiesFile).use { fis ->
             keystoreProperties.load(fis)
         }
+    }
 
-        signingConfigs {
-            create("release") {
-                storeFile = file(keystoreProperties["storeFile"] as String)
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                val storeFilePath = (keystoreProperties["storeFile"] as String).trim()
+                storeFile = rootProject.file(storeFilePath)
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
@@ -60,17 +64,35 @@ android {
 
     buildTypes {
         release {
-            // Use release keystore if provided; otherwise fall back to debug signing
-            if (project.file("../key.properties").exists()) {
-                signingConfig = signingConfigs.getByName("release")
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
+            if (!keystorePropertiesFile.exists()) {
+                throw org.gradle.api.GradleException(
+                    "Missing android/key.properties for release signing. Copy android/key.properties.example and configure your upload keystore."
+                )
+            }
+            signingConfig = signingConfigs.getByName("release")
+
+            // Size optimizations (no asset quality changes):
+            // - Shrink Java/Kotlin bytecode and Android resources for release.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+
+            // Exclude emulator ABIs from release to reduce bundle size.
+            ndk {
+                abiFilters.clear()
+                abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
             }
         }
         debug {
-            // Ensure test App ID is used for debug builds
-            manifestPlaceholders["ADMOB_APP_ID"] = (System.getenv("ADMOB_APP_ID")
-                ?: "ca-app-pub-3940256099942544~3347511713")
+            // Debug builds:
+            // - Prefer ADMOB_APP_ID_DEBUG if provided, else fall back to ADMOB_APP_ID (prod).
+            // Note: Android emulators are treated as test devices by Google Mobile Ads SDK.
+            manifestPlaceholders["ADMOB_APP_ID"] = (System.getenv("ADMOB_APP_ID_DEBUG")
+                ?: System.getenv("ADMOB_APP_ID")
+                ?: "ca-app-pub-4678612524495888~7606654160")
         }
     }
 }
@@ -80,7 +102,9 @@ flutter {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
+    implementation("com.google.firebase:firebase-crashlytics")
+
     // Core library desugaring support for java.time, streams etc.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
-

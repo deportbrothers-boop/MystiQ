@@ -18,6 +18,7 @@ import 'user_profile.dart';
 import '../../common/widgets/gold_bar.dart';
 import '../../theme/app_theme.dart';
 import '../../core/referral/referral_service.dart';
+import '../../core/access/sku_costs.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -150,7 +151,7 @@ class ProfilePage extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Arkadasini getir – 1 fal hakki kazan', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const Text('Arkadasini getir – 1 yorum hakki kazan', style: TextStyle(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 6),
                         Row(children: [
                           Expanded(child: SelectableText(code, style: const TextStyle(fontSize: 16))),
@@ -169,7 +170,7 @@ class ProfilePage extends StatelessWidget {
                               final ok = await ReferralService.redeemReferral(code: ctrl.text, ent: ent);
                               if (ctx.mounted) {
                                 Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? '+1 fal hakki (100 coin) verildi' : 'Kod kullanilamadi')));
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? '+1 yorum hakki (${SkuCosts.coffeeFast} coin) verildi' : 'Kod kullanilamadi')));
                               }
                             },
                             child: const Text('Kullan'),
@@ -181,7 +182,7 @@ class ProfilePage extends StatelessWidget {
                 },
               );
             },
-            label: const Text('Arkadasini getir – 1 fal hakki kazan'),
+            label: const Text('Arkadasini getir – 1 yorum hakki kazan'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -192,7 +193,7 @@ class ProfilePage extends StatelessWidget {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text('Promosyon Kodu'),
-                  content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'Kodu gir (1 kez, 1 fal hakki)')),
+                  content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'Kodu gir (1 kez, 1 yorum hakki)')),
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Iptal')),
                     ElevatedButton(
@@ -200,7 +201,7 @@ class ProfilePage extends StatelessWidget {
                         final ok = await ReferralService.redeemPromo(code: ctrl.text, ent: ent);
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Promosyon: +1 fal hakki (100 coin) verildi' : 'Gecersiz kod veya daha once kullanildi')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Promosyon: +1 yorum hakki (${SkuCosts.coffeeFast} coin) verildi' : 'Gecersiz kod veya daha once kullanildi')));
                         }
                       },
                       child: const Text('Kullan'),
@@ -213,28 +214,9 @@ class ProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          if (kDebugMode)
-            OutlinedButton.icon(
-              icon: const Icon(Icons.bug_report),
-              label: Text(AppLocalizations.of(context).t('profile.test.add_10000_button')),
-              onPressed: () async {
-                await ent.addCoins(10000);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(const SnackBar(content: Text('+10000 coin eklendi')));
-                }
-              },
-            ),
-          if (kDebugMode) const SizedBox(height: 12),
+          // Removed dev-only +10000 coins test button
 
-          // Premium
-          ElevatedButton(onPressed: () => context.push('/paywall'), child: Text(loc.t('profile.premium'))),
-          const SizedBox(height: 8),
-          Text(
-            ent.isPremium
-                ? "Premium: ${ent.premiumSku == 'lifetime.mystic_plus' ? 'Lifetime' : 'Bitis: ${ent.premiumUntil}'}"
-                : loc.t('premium.inactive'),
-          ),
+          ElevatedButton(onPressed: () => context.push('/paywall'), child: const Text('Coin Kazan')),
           const SizedBox(height: 8),
 
           // Daily reward

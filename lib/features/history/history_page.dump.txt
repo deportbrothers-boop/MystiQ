@@ -117,7 +117,7 @@ class _HistoryCard extends StatelessWidget {
                           const SizedBox(height: 6),
                           Text(AppLocalizations.of(context).t('coffee.fast.offer.desc') != 'coffee.fast.offer.desc'
                               ? AppLocalizations.of(context).t('coffee.fast.offer.desc')
-                              : 'Reklam izlerseniz kahve falınız 10 dk yerine 5 dk içinde hazır olur.'),
+                              : 'Reklam izlerseniz kahve yorumunuz 10 dk yerine 5 dk içinde hazır olur.'),
                           const SizedBox(height: 14),
                           Row(children: [
                             Expanded(child: ElevatedButton.icon(icon: const Icon(Icons.rocket_launch, size: 18), onPressed: () => Navigator.pop(context, 'ad'), label: Text(AppLocalizations.of(context).t('coffee.fast.watch_ad') != 'coffee.fast.watch_ad' ? AppLocalizations.of(context).t('coffee.fast.watch_ad') : 'Reklam izle (5 dk)'))),

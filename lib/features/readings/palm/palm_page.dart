@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,8 +9,8 @@ import '../../../core/access/sku_costs.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/readings/pending_readings_service_fixed.dart';
 import '../../../common/widgets/scanning_overlay.dart';
-import 'package:provider/provider.dart';
-import '../../../core/entitlements/entitlements_controller.dart';
+import '../../../core/ads/rewarded_helper.dart';
+import '../../../core/access/ai_generation_guard.dart';
 
 class PalmPage extends StatefulWidget {
   const PalmPage({super.key});
@@ -21,6 +21,8 @@ class PalmPage extends StatefulWidget {
 class _PalmPageState extends State<PalmPage> {
   File? image;
   bool scanning = false;
+  bool _adUsed = false;
+  String? _permit;
 
   double _goldAlpha = 0.35; // border color opacity
   double _goldStroke = 1.8; // border width
@@ -117,11 +119,64 @@ class _PalmPageState extends State<PalmPage> {
     );
   }
 
+  Future<void> _startReading({bool forceAd = false}) async {
+    if (image == null) return;
+    await Analytics.log('reading_started', {'type': forceAd ? 'palm_ad' : 'palm'});
+    if (!mounted) return;
+
+    // Prevent starting a new reading if there is a pending one
+    final nextAt = await PendingReadingsService.nextReadyAtForType('palm');
+    if (nextAt != null && nextAt.isAfter(DateTime.now())) {
+      if (!mounted) return;
+      final left = nextAt.difference(DateTime.now()).inMinutes + 1;
+      final msg = '${AppLocalizations.of(context).t('palm.title')} - bekleyen okuma var. Kalan: ~${left} dk';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      return;
+    }
+
+    final useAdFlow = forceAd;
+    if (useAdFlow) {
+      final remaining = await RewardedAds.remainingTodayFor('palm', maxPerDay: 1);
+      if (remaining <= 0) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bugunluk el cizgisi yorumu reklam hakkin doldu.')),
+        );
+        return;
+      }
+      final okAd = await RewardedAds.showMultiple(context: context, count: 2, key: 'palm');
+      if (!okAd || !mounted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Reklam gosterilemedi. Tekrar deneyin.')),
+          );
+        }
+        return;
+      }
+      if (!mounted) return;
+      _adUsed = true;
+      _permit = await AiGenerationGuard.issuePermit();
+      setState(() => scanning = true);
+      return;
+    }
+
+    final ok = await AccessGate.ensureCoinsOnlyOrPaywall(context, coinCost: SkuCosts.palmPremium);
+    if (!ok) return;
+    if (!mounted) return;
+    _adUsed = false;
+    _permit = await AiGenerationGuard.issuePermit();
+    context.push('/reading/result/palm', extra: {
+      'imagePath': image!.path,
+      'style': _style,
+      if ((_permit ?? '').trim().isNotEmpty) 'permit': _permit,
+      // streaming/local flags removed
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final gold = Theme.of(context).colorScheme.primary;
-    final ent = context.watch<EntitlementsController>();
-    final displayCost = (ent.isPremium || !ent.firstFreeUsed) ? 0 : SkuCosts.palmPremium;
+    final displayCost = SkuCosts.palmPremium;
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context).t('palm.title')),
@@ -202,74 +257,48 @@ class _PalmPageState extends State<PalmPage> {
               ),
             ]),
 
+
             const SizedBox(height: 10),
             SafeArea(
               top: false,
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: gold,
-                    foregroundColor: Colors.black,
-                    shape: const StadiumBorder(),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        side: BorderSide.none,
+                        shape: const StadiumBorder(),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.play_circle_outline, size: 18),
+                      label: const Text('2 Reklam izle'),
+                      onPressed: image == null ? null : () => _startReading(forceAd: true),
+                    ),
                   ),
-                  onPressed: image == null
-                      ? null
-                      : () async {
-                          await Analytics.log('reading_started', {'type': 'palm'});
-                          // Prevent starting a new reading if there is a pending one
-                          final nextAt = await PendingReadingsService.nextReadyAtForType('palm');
-                          if (nextAt != null && nextAt.isAfter(DateTime.now())) {
-                            if (!mounted) return;
-                            final left = nextAt.difference(DateTime.now()).inMinutes + 1;
-                            final msg = '${AppLocalizations.of(context).t('palm.title')} - bekleyen okuma var. Kalan: ~${left} dk';
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-                            return;
-                          }
-                          final ok = await AccessGate.ensureAccessOrPaywall(
-                            context,
-                            sku: 'reading.palm_premium',
-                            coinCost: SkuCosts.palmPremium,
-                          );
-                          if (!ok) return;
-                          if (!mounted) return;
-                          // If access was granted via coins, skip waiting and navigate immediately
-                          final entNow = context.read<EntitlementsController>();
-                          if (entNow.lastUnlockMethod == 'coins') {
-                            context.push('/reading/result/palm', extra: {
-                              'imagePath': image!.path,
-                              'style': _style,
-                              // streaming/local flags removed
-                            });
-                          } else {
-                            setState(() => scanning = true);
-                          }
-                        },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(AppLocalizations.of(context).t('palm.cta_start')),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.monetization_on_outlined, size: 16),
-                      const SizedBox(width: 2),
-                      Text('$displayCost'),
-                      if (displayCost == 0) ...[
-                        const SizedBox(width: 6),
-                        Tooltip(
-                          message: ent.isPremium
-                              ? (AppLocalizations.of(context).t('premium.free_reason') != 'premium.free_reason'
-                                  ? AppLocalizations.of(context).t('premium.free_reason')
-                                  : 'Premium: 0 coin')
-                              : (AppLocalizations.of(context).t('first_free.reason') != 'first_free.reason'
-                                  ? AppLocalizations.of(context).t('first_free.reason')
-                                  : 'İlk fal ücretsiz: 0 coin'),
-                          child: const Icon(Icons.info_outline, size: 16),
-                        ),
-                      ],
-                    ],
-                  )
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: gold,
+                        foregroundColor: Colors.black,
+                        shape: const StadiumBorder(),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: image == null ? null : () => _startReading(),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(AppLocalizations.of(context).t('palm.cta_start')),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.monetization_on_outlined, size: 16),
+                          const SizedBox(width: 2),
+                          Text('$displayCost'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ]),
@@ -292,6 +321,8 @@ class _PalmPageState extends State<PalmPage> {
                   extras: {
                     'imagePath': image!.path,
                     'style': _style,
+                    if ((_permit ?? '').trim().isNotEmpty) 'permit': _permit,
+                    if (_adUsed) 'adBoost': true,
                   },
                   locale: locale,
                 );
@@ -300,6 +331,8 @@ class _PalmPageState extends State<PalmPage> {
               context.push('/reading/result/palm', extra: {
                 'imagePath': image!.path,
                 'style': _style,
+                if ((_permit ?? '').trim().isNotEmpty) 'permit': _permit,
+                if (_adUsed) 'adBoost': true,
                 'sessionId': DateTime.now().millisecondsSinceEpoch,
                 'etaSeconds': eta.inSeconds,
                 'readyAt': readyAt.toIso8601String(),
@@ -338,5 +371,15 @@ class _PalmStarsPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PalmStarsPainter old) => old.goldAlpha != goldAlpha || old.starCount != starCount;
 }
-
-
+
+
+
+
+
+
+
+
+
+
+
+

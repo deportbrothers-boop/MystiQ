@@ -1,0 +1,5 @@
+MystiQ, kahve kupasindaki sekillerin sembolik yorumunu sunan eglencelik bir uygulamadir.
+Kisa ve akici metinlerle kahve yorumu alabilir, tematik cagrisimlari kesfedebilirsiniz.
+Icerikler sadece sembolik yorum ve keyifli deneyim amacli hazirlanir.
+
+Uygulamadaki tum icerikler eglence amaclidir ve kesinlik icermez.

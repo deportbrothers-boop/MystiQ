@@ -33,7 +33,7 @@ class _SignInPageState extends State<SignInPage> {
   Future<void> _signIn() async {
     setState(() => _error = null);
     if (!_validEmail) { setState(() => _error = 'Gecerli bir e-posta girin.'); return; }
-    if (!_validPassword) { setState(() => _error = 'Sifre en az 6 karakter olmali.'); return; }
+    if (!_validPassword) { setState(() => _error = 'Şifre en az 6 karakter olmalı.'); return; }
     if (_busy) return;
     _busy = true;
     try {
@@ -46,9 +46,6 @@ class _SignInPageState extends State<SignInPage> {
       // E-posta dogrulama zorunlu degil: ek kontrol yapmiyoruz
       // Hesap degisti ise yerel cache'leri temizleme; her kullanicinin local cache'i ayridir
       try {
-        final currentUid = FirebaseAuth.instance.currentUser?.uid;
-        final lastUid = (await SharedPreferences.getInstance()).getString('ent_last_uid');
-        final changed = (currentUid != null && currentUid != lastUid);
         if (mounted) {
           await context.read<EntitlementsController>().switchToCurrentUser();
           // History/Profile controllerleri, hesap degisse de kendi user-key'li cache'lerini kullanacak
@@ -96,7 +93,7 @@ class _SignInPageState extends State<SignInPage> {
             TextField(
               controller: _password,
               decoration: InputDecoration(
-                labelText: 'Sifre',
+                labelText: 'Şifre',
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
                   icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
@@ -115,18 +112,18 @@ class _SignInPageState extends State<SignInPage> {
                 TextButton(
                   onPressed: () async {
                     if (!_validEmail) {
-                      setState(() => _error = 'Sifre sifirlama icin gecerli e-posta girin.');
+                      setState(() => _error = 'Şifre sıfırlama için geçerli e-posta girin.');
                       return;
                     }
                     try {
                       await FirebaseAuth.instance.sendPasswordResetEmail(email: _email.text.trim());
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sifre sifirlama e-postasi gonderildi.')));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Şifre sıfırlama e-postası gönderildi.')));
                     } catch (e) {
-                      setState(() => _error = 'Sifre sifirlama basarisiz: $e');
+                      setState(() => _error = 'Şifre sıfırlama başarısız: $e');
                     }
                   },
-                  child: Text(loc.t('auth.forgot') != 'auth.forgot' ? loc.t('auth.forgot') : 'Sifreyi unuttun mu?'),
+                  child: Text(loc.t('auth.forgot') != 'auth.forgot' ? loc.t('auth.forgot') : 'Şifreyi unuttun mu?'),
                 ),
               ],
             ),
@@ -147,7 +144,7 @@ class _SignInPageState extends State<SignInPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text('Hesabin yok mu? '),
-                TextButton(onPressed: () => context.push('/auth/signup'), child: const Text('Kayit Ol')),
+                TextButton(onPressed: () => context.push('/auth/signup'), child: const Text('Kayıt Ol')),
               ],
             )
           ],

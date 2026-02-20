@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
+import 'dart:math' as math;
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/entitlements/entitlements_controller.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/ads/rewarded_helper.dart';
 import '../../core/i18n/app_localizations.dart';
 import '../../common/widgets/sharp_image.dart';
 
-class FalHubPage extends StatefulWidget {
-  const FalHubPage({super.key});
+class ReadingHubPage extends StatefulWidget {
+  const ReadingHubPage({super.key});
   @override
-  State<FalHubPage> createState() => _FalHubPageState();
+  State<ReadingHubPage> createState() => _ReadingHubPageState();
 }
 
-class _FalHubPageState extends State<FalHubPage> {
+class _ReadingHubPageState extends State<ReadingHubPage> {
   @override
   void initState() {
     super.initState();
@@ -43,11 +42,11 @@ class _FalHubPageState extends State<FalHubPage> {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _FalItem(AppLocalizations.of(context).t('coffee.title'), Icons.coffee, '/reading/coffee', image: 'assets/images/categories/coffee.png'),
-      _FalItem(AppLocalizations.of(context).t('tarot.title'), Icons.style, '/reading/tarot', image: 'assets/images/categories/tarot.png'),
-      _FalItem(AppLocalizations.of(context).t('palm.title'), Icons.pan_tool_alt_outlined, '/reading/palm', image: 'assets/images/categories/palm.png'),
-      _FalItem(AppLocalizations.of(context).t('astro.title'), Icons.brightness_2_outlined, '/reading/astro', image: 'assets/images/categories/astro.png'),
-      _FalItem(
+      _ReadingItem(AppLocalizations.of(context).t('coffee.title'), Icons.coffee, '/reading/coffee', image: 'assets/images/categories/coffee.png'),
+      _ReadingItem(AppLocalizations.of(context).t('tarot.title'), Icons.style, '/reading/tarot', image: 'assets/images/categories/tarot.png'),
+      _ReadingItem(AppLocalizations.of(context).t('palm.title'), Icons.pan_tool_alt_outlined, '/reading/palm', image: 'assets/images/categories/palm.png'),
+      _ReadingItem(AppLocalizations.of(context).t('astro.title'), Icons.brightness_2_outlined, '/reading/astro', image: 'assets/images/categories/astro.png'),
+      _ReadingItem(
         AppLocalizations.of(context).t('live.title'),
         Icons.live_tv,
         '/live',
@@ -55,13 +54,14 @@ class _FalHubPageState extends State<FalHubPage> {
         disabled: true,
         disabledLabel: AppLocalizations.of(context).t('common.coming_soon'),
       ),
-      _FalItem(AppLocalizations.of(context).t('dream.title'), Icons.nightlight_round, '/reading/dream', image: 'assets/images/categories/dream.png'),
+      _ReadingItem(AppLocalizations.of(context).t('dream.title'), Icons.nightlight_round, '/reading/dream', image: 'assets/images/categories/dream.png'),
     ];
 
     final coins = context.watch<EntitlementsController>().coins;
     final loc = AppLocalizations.of(context);
     final premium = context.watch<EntitlementsController>().isPremium;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: Text(loc.t('app.name')), actions: [
         if (!premium)
           Padding(
@@ -81,38 +81,43 @@ class _FalHubPageState extends State<FalHubPage> {
             ),
           )
       ]),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.0,
+          const _ReadingHubBackground(),
+          Column(
+            children: [
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 1.0,
+                  ),
+                  itemCount: items.length,
+                  itemBuilder: (_, i) => items[i],
+                ),
               ),
-              itemCount: items.length,
-              itemBuilder: (_, i) => items[i],
-            ),
+              const SizedBox(height: 8),
+              _MotivationBanner(),
+              const SizedBox(height: 12),
+            ],
           ),
-          const SizedBox(height: 8),
-          _MotivationBanner(),
-          const SizedBox(height: 12),
         ],
       ),
     );
   }
 }
 
-class _FalItem extends StatelessWidget {
+class _ReadingItem extends StatelessWidget {
   final String title;
   final IconData icon;
   final String route;
   final String? image;
   final bool disabled;
   final String? disabledLabel;
-  const _FalItem(this.title, this.icon, this.route, {this.image, this.disabled = false, this.disabledLabel});
+  const _ReadingItem(this.title, this.icon, this.route, {this.image, this.disabled = false, this.disabledLabel});
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +194,7 @@ class _FalItem extends StatelessWidget {
                 ),
               ),
             // Show the title always, even when disabled, so users see
-            // "Canlı Falcı" under the tile with a "Yakında" badge.
+            // "Canli Yorumcu" under the tile with a "Yakinda" badge.
             Positioned(
               left: 12,
               right: 12,
@@ -220,7 +225,7 @@ class _CoverImage extends StatelessWidget {
     if (image == null) {
       return Center(child: Icon(icon, size: 64, color: Theme.of(context).colorScheme.primary));
     }
-    return SharpAssetFallback(
+    return SharpImage.asset(
       image!,
       fit: BoxFit.cover,
       errorBuilder: (c, e, s) => Center(
@@ -230,46 +235,104 @@ class _CoverImage extends StatelessWidget {
   }
 }
 
+/// Kahve yorumu ana ekrani icin koyu mor zemin + belirgin toz altin bulutlari.
+class _ReadingHubBackground extends StatelessWidget {
+  const _ReadingHubBackground();
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.expand(
+      child: Image.asset(
+        'assets/images/bg/bgfal_hub_starry_bg.png',
+        fit: BoxFit.cover,
+      ),
+    );
+  }
+}
+
+class _ReadingHubGoldDustPainter extends CustomPainter {
+  static const Color _gold = Color(0xFFD8B982);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = _gold.withOpacity(0.14)
+      ..style = PaintingStyle.fill;
+    final rnd = math.Random(7);
+    // Gözle görünür, büyük ama soft altın bulutları
+    for (var i = 0; i < 22; i++) {
+      final dx = rnd.nextDouble() * size.width;
+      final dy = rnd.nextDouble() * size.height;
+      final radius = 36 + rnd.nextDouble() * 80;
+      canvas.drawCircle(Offset(dx, dy), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Koyu, buton altınıyla uyumlu degrade üzerinde hafif "altın tozu" efekti.
+class _MystiqGoldDustBackground extends StatelessWidget {
+  const _MystiqGoldDustBackground();
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _GoldDustPainter(),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A141F), // yüzeye yakın koyu ton
+              Color(0xFF0F0D15), // AppTheme.bg ile uyumlu alt ton
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoldDustPainter extends CustomPainter {
+  // Butonlardaki altın renge yakın hafif parıltı
+  static const Color _gold = Color(0xFFFFC857);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = _gold.withOpacity(0.14)
+      ..style = PaintingStyle.fill;
+    final rnd = math.Random(42);
+    for (var i = 0; i < 80; i++) {
+      final dx = rnd.nextDouble() * size.width;
+      final dy = rnd.nextDouble() * size.height;
+      final radius = 0.6 + rnd.nextDouble() * 1.6;
+      canvas.drawCircle(Offset(dx, dy), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _MotivationBanner extends StatelessWidget {
   _MotivationBanner();
-  Future<void> _openWithAd(BuildContext context) async {
-    final sp = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final ymd = '${now.year}-${now.month}-${now.day}';
-    final usedYmd = sp.getString('motivation_ymd');
-    if (usedYmd == ymd) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).t('motivation.daily_used') != 'motivation.daily_used'
-            ? AppLocalizations.of(context).t('motivation.daily_used')
-            : 'Bugunun motivasyonu zaten alinmis.')),
-      );
-      return;
-    }
-    final ok = await RewardedAds.show(context: context);
-    if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).t('ad.failed') != 'ad.failed'
-            ? AppLocalizations.of(context).t('ad.failed')
-            : 'Reklam gosterilemedi. Tekrar deneyin.')),
-      );
-      return;
-    }
-    try { await RewardedAds.recordOne(); } catch (_) {}
-    await sp.setString('motivation_ymd', ymd);
+  void _open(BuildContext context) {
     if (context.mounted) context.push('/motivation');
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
-    final title = 'Gunluk Motivasyon';
+    final title = 'Günlük Motivasyon';
     final tip = '';
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () async { await _openWithAd(context); },
+        onTap: () => _open(context),
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(

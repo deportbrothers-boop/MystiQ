@@ -15,6 +15,7 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   bool _navigated = false;
+  static const String _kInfoAccepted = 'coffee_info_accepted';
 
   @override
   void initState() {
@@ -29,6 +30,7 @@ class _SplashPageState extends State<SplashPage> {
       await Future.delayed(const Duration(milliseconds: 600));
       final prefs = await SharedPreferences.getInstance();
       final remember = prefs.getBool('remember_me') ?? false;
+      final infoAccepted = prefs.getBool(_kInfoAccepted) ?? false;
       User? user;
       try {
         user = FirebaseAuth.instance.currentUser;
@@ -39,18 +41,65 @@ class _SplashPageState extends State<SplashPage> {
         try { await FirebaseAuth.instance.signOut(); } catch (_) {}
         user = null;
       }
+      final target = (remember && user != null) ? '/home' : '/onboarding';
+      if (!infoAccepted) {
+        if (!mounted) return;
+        final ok = await _showInfoDialog();
+        if (!ok || !mounted) return;
+        await prefs.setBool(_kInfoAccepted, true);
+      }
       if (!mounted || _navigated) return;
       _navigated = true;
-      if (remember && user != null) {
-        context.go('/home');
-      } else {
-        context.go('/onboarding');
-      }
+      context.go(target);
     } catch (_) {
       if (!mounted || _navigated) return;
       _navigated = true;
       context.go('/onboarding');
     }
+  }
+
+  Future<bool> _showInfoDialog() async {
+    bool checked = false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return WillPopScope(
+              onWillPop: () async => false,
+              child: AlertDialog(
+                title: const Text('Bilgilendirme'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Bu uygulama eğlence amaçlı kahve yorumu sunar. '
+                      'Gelecek hakkında tahmin yapmaz ve kesinlik içermez.',
+                    ),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      value: checked,
+                      onChanged: (v) => setState(() => checked = v ?? false),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('Okudum, kabul ediyorum'),
+                    ),
+                  ],
+                ),
+                actions: [
+                  ElevatedButton(
+                    onPressed: checked ? () => Navigator.of(ctx).pop(true) : null,
+                    child: const Text('Devam'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    return result == true;
   }
 
   @override

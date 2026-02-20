@@ -155,6 +155,9 @@ class PendingReadingsService2 {
         try {
           AiService.configure();
           generated = await AiService.generate(type: type, profile: profile.profile, extras: extras, locale: locale);
+          if (type == 'coffee') {
+            generated = AiService.postProcessCoffeeText(generated);
+          }
         } catch (_) {
           generated = 'Uretim su anda yapilamiyor.';
         }
@@ -172,4 +175,3 @@ class PendingReadingsService2 {
     await _save(remaining);
   }
 }
-

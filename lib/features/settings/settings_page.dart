@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../core/i18n/locale_controller.dart';
 import '../legal/legal_pages.dart';
+import 'info_page.dart';
 import '../../core/i18n/app_localizations.dart';
+import '../../core/ads/ad_service.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -15,12 +17,23 @@ class SettingsPage extends StatelessWidget {
     final current = ctrl.locale?.languageCode;
     return Scaffold(
       appBar: AppBar(title: Text(loc.t('settings.title'))),
+      bottomNavigationBar: const SafeArea(top: false, child: AdBanner()),
       body: ListView(
         children: [
           ListTile(
             title: Text(loc.t('settings.language')),
             subtitle: Text(_labelFor(current, loc)),
             onTap: () => _openLanguageSheet(context, current),
+          ),
+          const Divider(height: 24),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Bilgilendirme'),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const InfoPage()),
+              );
+            },
           ),
           const Divider(height: 24),
           ListTile(

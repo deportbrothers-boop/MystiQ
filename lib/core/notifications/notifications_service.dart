@@ -7,6 +7,8 @@ import 'package:timezone/timezone.dart' as tz;
 class NotificationsService {
   static final _plugin = FlutterLocalNotificationsPlugin();
   static const _dailyEnabledKey = 'dailyNotifEnabled';
+  static const _inactivityNotifId = 2002;
+  static const _lastActiveAtMsKey = 'lastActiveAtMs';
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -54,7 +56,7 @@ class NotificationsService {
       await _plugin.zonedSchedule(
         1001,
         'MystiQ',
-        '\\u{1F319} Evren senin icin bugun ozel bir mesaj gonderdi. Gel ve kesfet.',
+        'Bugün kendin için küçük bir an ayır: Kahve Yorumu seni bekliyor.',
         next,
         details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -62,6 +64,26 @@ class NotificationsService {
         matchDateTimeComponents: DateTimeComponents.time,
       );
     } catch (_) {}
+  }
+
+  /// Kullanıcı uygulamayı 24 saat açmazsa bir hatırlatma bildirimi planlar.
+  /// Not: Kullanıcı sistem bildirim iznini kapattıysa bildirim gösterilemez.
+  static Future<void> touchAndScheduleInactivityReminder({Duration after = const Duration(hours: 24)}) async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setInt(_lastActiveAtMsKey, DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {}
+
+    try {
+      await cancelOneShot(_inactivityNotifId);
+    } catch (_) {}
+
+    await scheduleOneShot(
+      id: _inactivityNotifId,
+      title: 'MystiQ',
+      body: 'Sadece senin için açılan bir yorum var.',
+      secondsFromNow: after.inSeconds.clamp(60, 7 * 24 * 3600),
+    );
   }
 
   static Future<void> scheduleOneShot({

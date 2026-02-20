@@ -6,6 +6,7 @@ import '../../../core/access/sku_costs.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../common/ui/responsive.dart';
 import '../../../core/ads/rewarded_helper.dart';
+import '../../../core/access/ai_generation_guard.dart';
 import '../../../common/widgets/sharp_image.dart';
 import 'package:provider/provider.dart';
 import '../../../core/entitlements/entitlements_controller.dart';
@@ -48,13 +49,16 @@ class _TarotPageState extends State<TarotPage> {
         final names = (extras['cards'] as List?)?.map((e) => '$e').toList() ?? const <String>[];
         final idxs = (extras['cardIndices'] as List?)?.map((e) => int.tryParse('$e') ?? -1).where((e) => e >= 0).toList() ?? const <int>[];
         final reversed = (extras['reversed'] as List?)?.map((e) => e == true).toList() ?? const <bool>[];
+        final pendingId = item['id']?.toString();
         context.push('/reading/result/tarot', extra: {
           'cards': names,
           'cardIndices': idxs,
           'reversed': reversed,
+          if ((extras['permit'] ?? '').toString().trim().isNotEmpty) 'permit': extras['permit'],
           'etaSeconds': readyAt.difference(DateTime.now()).inSeconds.clamp(0, 86400),
           'readyAt': readyAt.toIso8601String(),
           'generateAtReady': true,
+          if (pendingId != null && pendingId.isNotEmpty) 'pendingId': pendingId,
           // streaming/local flags removed
         });
       } catch (_) {}
@@ -73,10 +77,37 @@ class _TarotPageState extends State<TarotPage> {
             const SizedBox(height: 8),
             Row(
               children: [
-                OutlinedButton.icon(
+                    OutlinedButton.icon(
                   onPressed: selected.length < 3 ? null : () async {
                     await Analytics.log('reading_started', {'type': 'tarot_ad'});
-                    final ok = await RewardedAds.show(context: context);
+                    const isPremium = false;
+                    if (isPremium) {
+                      final idxs = _slots.whereType<int>().toList();
+                      final names = idxs.map(TarotDeck.nameForIndex).toList();
+                      final nowMs = DateTime.now().millisecondsSinceEpoch;
+                      final reversed = List<bool>.generate(idxs.length, (k) => ((nowMs + k + idxs[k]) % 2) == 0);
+                      if (!context.mounted) return;
+                      context.push('/reading/result/tarot', extra: {
+                        'cards': names,
+                        'cardIndices': idxs,
+                        'reversed': reversed,
+                        'topic': _topic,
+                        'style': _style,
+                        // streaming/local flags removed
+                      });
+                      return;
+                    }
+                    if (!isPremium) {
+                      final remaining = await RewardedAds.remainingTodayFor('tarot', maxPerDay: 1);
+                      if (remaining <= 0) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Bugunluk tarot reklam hakkin doldu.')),
+                        );
+                        return;
+                      }
+                    }
+                    final ok = await RewardedAds.showMultiple(context: context, count: 2, key: 'tarot');
                     if (!context.mounted) return;
                     if (!ok) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -88,7 +119,7 @@ class _TarotPageState extends State<TarotPage> {
                       );
                       return;
                     }
-                    try { await RewardedAds.recordOne(); } catch (_) {}
+                    final permit = await AiGenerationGuard.issuePermit();
                     final idxs = _slots.whereType<int>().toList();
                     final names = idxs.map(TarotDeck.nameForIndex).toList();
                     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -103,6 +134,7 @@ class _TarotPageState extends State<TarotPage> {
                         'reversed': reversed,
                         'topic': _topic,
                         'style': _style,
+                        'permit': permit,
                         'adBoost': true,
                       };
                       final locale = Localizations.localeOf(context).languageCode;
@@ -128,13 +160,14 @@ class _TarotPageState extends State<TarotPage> {
                       SnackBar(content: Text(
                         AppLocalizations.of(context).t('tarot.fast.thanks') != 'tarot.fast.thanks'
                             ? AppLocalizations.of(context).t('tarot.fast.thanks')
-                            : 'Teşekkürler! Falın 8 dk içinde hazır olacak.',
+                            : 'Teşekkürler! Yorumun 8 dk içinde hazır.',
                       )),
                     );
                     context.push('/reading/result/tarot', extra: {
                       'cards': names,
                       'cardIndices': idxs,
                       'reversed': reversed,
+                      'permit': permit,
                       'sessionId': DateTime.now().millisecondsSinceEpoch,
                       'etaSeconds': eta.inSeconds,
                       'readyAt': readyAt.toIso8601String(),
@@ -149,7 +182,7 @@ class _TarotPageState extends State<TarotPage> {
                   label: Text(
                     AppLocalizations.of(context).t('tarot.entry.watch_and_read') != 'tarot.entry.watch_and_read'
                         ? AppLocalizations.of(context).t('tarot.entry.watch_and_read')
-                        : 'Reklam izle (8 dk)',
+                        : '2 Reklam izle (8 dk)',
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -158,6 +191,22 @@ class _TarotPageState extends State<TarotPage> {
                     onPressed: selected.length < 3 ? null : () async {
                       await Analytics.log('reading_started', {'type': 'tarot'});
                       final ent = context.read<EntitlementsController>();
+                      if (false) {
+                        final idxs = _slots.whereType<int>().toList();
+                        final names = idxs.map(TarotDeck.nameForIndex).toList();
+                        final nowMs = DateTime.now().millisecondsSinceEpoch;
+                        final reversed = List<bool>.generate(idxs.length, (k) => ((nowMs + k + idxs[k]) % 2) == 0);
+                        if (!context.mounted) return;
+                        context.push('/reading/result/tarot', extra: {
+                          'cards': names,
+                          'cardIndices': idxs,
+                          'reversed': reversed,
+                          'topic': _topic,
+                          'style': _style,
+                          // streaming/local flags removed
+                        });
+                        return;
+                      }
                       final confirmed = await showModalBottomSheet<bool>(
                         context: context,
                         showDragHandle: true,
@@ -175,7 +224,7 @@ class _TarotPageState extends State<TarotPage> {
                                 const SizedBox(height: 8),
                                 Text(AppLocalizations.of(context).t('coins.confirm.body') != 'coins.confirm.body'
                                     ? AppLocalizations.of(context).t('coins.confirm.body')
-                                    : 'Bu tarot falı için ${SkuCosts.tarotDeep} coin harcanacak. Bakiyeniz: ${ent.coins}'),
+                                    : 'Bu tarot yorumu için ${SkuCosts.tarotDeep} coin harcanacak. Bakiyeniz: ${ent.coins}'),
                                 const SizedBox(height: 12),
                                 Row(children: [
                                   Expanded(
@@ -207,6 +256,7 @@ class _TarotPageState extends State<TarotPage> {
                       );
                       if (!ok) return;
                       if (!context.mounted) return;
+                      final permit = await AiGenerationGuard.issuePermit();
                       final idxs = _slots.whereType<int>().toList();
                       final names = idxs.map(TarotDeck.nameForIndex).toList();
                       final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -218,6 +268,7 @@ class _TarotPageState extends State<TarotPage> {
                         'cards': names,
                         'cardIndices': idxs,
                         'reversed': reversed,
+                        'permit': permit,
                         'topic': _topic,
                         'style': _style,
                         // streaming/local flags removed
@@ -446,10 +497,10 @@ class _TarotPageState extends State<TarotPage> {
                     children: [
                       OutlinedButton.icon(
                         onPressed: selected.length < 3
-                            ? null
-                            : () async {
-                                await Analytics.log('reading_started', {'type': 'tarot_ad'});
-                                final ok = await RewardedAds.show(context: context);
+                              ? null
+                              : () async {
+                                  await Analytics.log('reading_started', {'type': 'tarot_ad'});
+                                final ok = await RewardedAds.showMultiple(context: context, count: 2, key: 'tarot');
                                 if (!context.mounted) return;
                                 if (!ok) {
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -463,7 +514,7 @@ class _TarotPageState extends State<TarotPage> {
                                   );
                                   return;
                                 }
-                                try { await RewardedAds.recordOne(); } catch (_) {}
+                                final permit = await AiGenerationGuard.issuePermit();
                                 final idxs = _slots.whereType<int>().toList();
                                 final names = idxs.map(TarotDeck.nameForIndex).toList();
                                 final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -478,6 +529,7 @@ class _TarotPageState extends State<TarotPage> {
                                     'reversed': reversed,
                                     'topic': _topic,
                                     'style': _style,
+                                    'permit': permit,
                                     'adBoost': true,
                                   };
                                   final locale = Localizations.localeOf(context).languageCode;
@@ -504,7 +556,7 @@ class _TarotPageState extends State<TarotPage> {
                                     content: Text(
                                       AppLocalizations.of(context).t('tarot.fast.thanks') != 'tarot.fast.thanks'
                                           ? AppLocalizations.of(context).t('tarot.fast.thanks')
-                                          : 'Teşekkürler! Falın 8 dk içinde hazır olacak.',
+                                          : 'Teşekkürler! Yorumun 8 dk içinde hazır.',
                                     ),
                                   ),
                                 );
@@ -512,6 +564,7 @@ class _TarotPageState extends State<TarotPage> {
                                   'cards': names,
                                   'cardIndices': idxs,
                                   'reversed': reversed,
+                                  'permit': permit,
                                   'sessionId': DateTime.now().millisecondsSinceEpoch,
                                   'etaSeconds': eta.inSeconds,
                                   'readyAt': readyAt.toIso8601String(),
@@ -526,7 +579,7 @@ class _TarotPageState extends State<TarotPage> {
                         label: Text(
                           AppLocalizations.of(context).t('tarot.entry.watch_and_read') != 'tarot.entry.watch_and_read'
                               ? AppLocalizations.of(context).t('tarot.entry.watch_and_read')
-                              : 'Reklam izle (8 dk)',
+                              : '2 Reklam izle (8 dk)',
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -556,7 +609,7 @@ class _TarotPageState extends State<TarotPage> {
                                       const SizedBox(height: 8),
                                       Text(AppLocalizations.of(context).t('coins.confirm.body') != 'coins.confirm.body'
                                           ? AppLocalizations.of(context).t('coins.confirm.body')
-                                          : 'Bu tarot falı için ${SkuCosts.tarotDeep} coin harcanacak. Bakiyeniz: ${ent.coins}'),
+                                          : 'Bu tarot yorumu için ${SkuCosts.tarotDeep} coin harcanacak. Bakiyeniz: ${ent.coins}'),
                                       const SizedBox(height: 12),
                                       Row(children: [
                                         Expanded(
@@ -590,6 +643,7 @@ class _TarotPageState extends State<TarotPage> {
                             );
                             if (!ok) return;
                             if (!context.mounted) return;
+                            final permit = await AiGenerationGuard.issuePermit();
 
                             // 3) Offer rewarded ad to reduce ETA 10 -> 5 minutes
                             Duration eta = Duration.zero;
@@ -617,7 +671,7 @@ class _TarotPageState extends State<TarotPage> {
                                         Text(
                                           AppLocalizations.of(context).t('tarot.fast.offer.body') != 'tarot.fast.offer.body'
                                               ? AppLocalizations.of(context).t('tarot.fast.offer.body')
-                                              : 'Reklam izlerseniz tarot falınız 10 dk yerine 5 dk içinde hazır olur.',
+                                              : 'Reklam izlerseniz tarot yorumunuz 10 dk yerine 5 dk içinde hazır olur.',
                                         ),
                                         const SizedBox(height: 14),
                                         Row(children: [
@@ -662,7 +716,7 @@ class _TarotPageState extends State<TarotPage> {
                                       SnackBar(content: Text(
                                         AppLocalizations.of(context).t('tarot.fast.thanks') != 'tarot.fast.thanks'
                                             ? AppLocalizations.of(context).t('tarot.fast.thanks')
-                                            : 'Teşekkürler! Falın 5 dk içinde hazır olacak.'
+                                            : 'Teşekkürler! Yorumun 5 dk içinde hazır.'
                                       )),
                                     );
                                   }
@@ -692,6 +746,7 @@ class _TarotPageState extends State<TarotPage> {
                                   'cards': names,
                                   'cardIndices': idxs,
                                   'reversed': reversed,
+                                  'permit': permit,
                                   'topic': _topic,
                                   'style': _style,
                                   // allow streaming for coin path (immediate)
@@ -708,6 +763,7 @@ class _TarotPageState extends State<TarotPage> {
                                 'reversed': reversed,
                                 'topic': _topic,
                                 'style': _style,
+                                'permit': permit,
                                 'notifyOnly': true,
                                 if (adUsed) 'adBoost': true,
                               };
@@ -734,6 +790,7 @@ class _TarotPageState extends State<TarotPage> {
                                 'cards': names,
                                 'cardIndices': idxs,
                                 'reversed': reversed,
+                                'permit': permit,
                                 'sessionId': DateTime.now().millisecondsSinceEpoch,
                                 'etaSeconds': eta.inSeconds,
                                 'readyAt': readyAt.toIso8601String(),

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/services.dart' show rootBundle;
 
 class CatalogItem {
   final String sku;
@@ -71,25 +70,10 @@ class ProductCatalog {
   });
 
   static Future<ProductCatalog> load() async {
-    String txt;
-    try {
-      // Prefer clean, UTF-8 safe catalog if present
-      txt = await rootBundle.loadString('assets/config/products_clean.json');
-    } catch (_) {
-      txt = await rootBundle.loadString('assets/config/products.json');
-    }
-    final j = json.decode(txt) as Map<String, dynamic>;
-    List<CatalogItem> parse(String key) =>
-        (j[key] as List).map((e) => CatalogItem.fromJson(e, key)).toList();
-
-    final subs = parse('subscriptions')
-        .where((e) => e.sku != 'lifetime.mystic_plus')
-        .toList();
-
     return ProductCatalog(
-      subscriptions: subs,
-      onetime: parse('onetime'),
-      coins: parse('coins'),
+      subscriptions: const [],
+      onetime: const [],
+      coins: const [],
     );
   }
 }

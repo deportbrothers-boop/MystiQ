@@ -13,6 +13,7 @@ class HistoryController with ChangeNotifier {
 
   // Very short or generic "preparing/loading" texts are treated as placeholders.
   // Only placeholders are allowed to be overwritten by a later final result.
+  // ignore: unused_element
   bool _looksLikePlaceholder(String t) {
     final s = t.toLowerCase().trim();
     if (s.isEmpty) return true;

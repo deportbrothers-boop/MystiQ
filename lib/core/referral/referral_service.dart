@@ -37,13 +37,13 @@ class ReferralService {
     if (used.contains(code)) return false;
     used.add(code);
     await sp.setStringList(_kUsed, used);
-    await ent.addCoins(SkuCosts.coffeeFast); // 1 reading right ~ 100 coins
+    await ent.addCoins(SkuCosts.coffeeFast); // 1 yorum hakkı = 1 kahve yorumu maliyeti
     return true;
   }
 
   static Future<void> shareMyCode(BuildContext context) async {
     final code = await myCode();
-    final msg = 'MystiQ referans kodum: $code\nKullan, 1 fal hakki kazan!';
+    final msg = 'MystiQ referans kodum: $code\nKullan, 1 yorum hakki kazan!';
     await Share.share(msg, subject: 'MystiQ Referans Kodu');
   }
 
@@ -65,4 +65,3 @@ class ReferralService {
     return true;
   }
 }
-

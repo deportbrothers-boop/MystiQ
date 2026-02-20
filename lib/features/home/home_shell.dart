@@ -3,12 +3,11 @@ import 'fal_hub_page_fixed.dart';
 import '../history/history_page.dart';
 import '../profile/profile_page.dart';
 import 'package:provider/provider.dart';
-import '../../core/entitlements/entitlements_controller.dart';
 import '../../core/readings/pending_readings_service_fixed.dart';
 import '../profile/profile_controller.dart';
 import '../history/history_controller.dart';
-import '../../core/ads/ad_service.dart';
 import '../../core/i18n/app_localizations.dart';
+import '../../core/ads/ad_service.dart';
 import '../live/live_chat_page_fixed.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,7 +20,8 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int index = 0;
-  final pages = const [FalHubPage(), LiveChatPage(), HistoryPage(), ProfilePage()];
+  final pages = const [ReadingHubPage(), LiveChatPage(), HistoryPage(), ProfilePage()];
+  static const bool _liveTabEnabled = false;
 
   @override
   void initState() {
@@ -69,18 +69,18 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final isPremium = context.watch<EntitlementsController>().isPremium;
     final loc = AppLocalizations.of(context);
-    final navFal = loc.t('nav.fal');
-    // Rename bottom tab to AI Canlı (or AI Live) to distinguish from
-    // the separate "Canlı Falcı" tile on the hub.
+    final navCoffee = loc.t('nav.coffee');
+    // Rename bottom tab to AI Canli (or AI Live) to distinguish from
+    // the separate "Canli Yorumcu" tile on the hub.
     final navLive = (loc.t('nav.live_ai') != 'nav.live_ai')
         ? loc.t('nav.live_ai')
-        : (Localizations.localeOf(context).languageCode.startsWith('tr') ? 'AI Canlı' : 'AI Live');
+        : (Localizations.localeOf(context).languageCode.startsWith('tr') ? 'AI Canli' : 'AI Live');
     final navHistory = loc.t('nav.history');
     final navProfile = loc.t('nav.profile');
     const gold = Color(0xFFFFC857); // MystiQ altin tonu
     const unSel = Colors.white70;
+    const liveDisabled = Colors.white38;
     return PopScope(
       canPop: index == 0,
       onPopInvokedWithResult: (didPop, result) {
@@ -92,16 +92,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         body: Column(
           children: [
             Expanded(child: pages[index]),
-            if (!isPremium) const AdBanner(),
+            if (index == 0 || index == 2) const SafeArea(top: false, child: AdBanner()),
           ],
         ),
         bottomNavigationBar: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF151019), Color(0xFF0F0D15)],
-            ),
+            color: Color(0xFF12051F),
             boxShadow: [
               BoxShadow(color: Colors.black54, blurRadius: 12, offset: Offset(0, -4)),
             ],
@@ -121,11 +117,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, letterSpacing: 0.2),
               currentIndex: index,
               onTap: (i) {
-                if (i == 1) {
-                  final msg = (AppLocalizations.of(context).t('common.coming_soon') != 'common.coming_soon')
-                      ? AppLocalizations.of(context).t('common.coming_soon')
-                      : 'Yakinda';
-                  try { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))); } catch (_) {}
+                if (i == 1 && !_liveTabEnabled) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Canlı yorumcu yakında aktif olacak.')),
+                  );
                   return;
                 }
                 setState(() => index = i);
@@ -133,10 +128,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               items: [
                 BottomNavigationBarItem(
                   icon: _BarIcon(icon: Icons.auto_awesome, active: index == 0, color: gold, inactive: unSel),
-                  label: navFal,
+                  label: navCoffee,
                 ),
                 BottomNavigationBarItem(
-                  icon: _BarIcon(icon: Icons.chat_bubble_outline, active: index == 1, color: gold, inactive: unSel),
+                  icon: _BarIcon(
+                    icon: Icons.chat_bubble_outline,
+                    active: index == 1 && _liveTabEnabled,
+                    color: gold,
+                    inactive: _liveTabEnabled ? unSel : liveDisabled,
+                  ),
                   label: (Localizations.localeOf(context).languageCode.startsWith('tr') ? 'Canli' : 'Live'),
                 ),
                 BottomNavigationBarItem(

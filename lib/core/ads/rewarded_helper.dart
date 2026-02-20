@@ -1,81 +1,114 @@
 ﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'ad_service.dart';
 import 'dart:io';
 
 class RewardedAds {
-  // Google test rewarded ad unit id
+  // Production rewarded ad unit ids
   static const String _androidUnit = 'ca-app-pub-4678612524495888/4461067330';
   static const String _iosUnit = 'ca-app-pub-4678612524495888/8396442918';
-  static const String _kYmd = 'ad_coin_ymd';
-  static const String _kCount = 'ad_coin_count';
 
   static Future<bool> show({required BuildContext context, String? adUnitId}) async {
     final completer = Completer<bool>();
-    try {
+    bool retried = false;
+    var earned = false;
+    var impression = false;
+    var showed = false;
+
+    Future<void> loadOnce() async {
       await RewardedAd.load(
         adUnitId: adUnitId ?? (Platform.isIOS ? _iosUnit : _androidUnit),
-        request: const AdRequest(),
+        request: AdService.buildRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (RewardedAd ad) async {
-            debugPrint('[Rewarded] loaded: ' + ad.adUnitId);
+            debugPrint('[Rewarded] loaded: ${ad.adUnitId}');
             ad.fullScreenContentCallback = FullScreenContentCallback(
+              onAdShowedFullScreenContent: (ad) {
+                showed = true;
+                debugPrint('[Rewarded] showed');
+              },
+              onAdImpression: (ad) {
+                impression = true;
+                debugPrint('[Rewarded] impression');
+              },
               onAdDismissedFullScreenContent: (ad) {
+                debugPrint('[Rewarded] dismissed (earned=$earned, impression=$impression)');
                 ad.dispose();
-                if (!completer.isCompleted) completer.complete(false);
+                // Bazı cihazlarda `onUserEarnedReward` tetiklenmeyebiliyor;
+                // reklam gerçekten gösterildiyse (showed/impression) akışı bloklamayalım.
+                if (!completer.isCompleted) completer.complete(earned || impression || showed);
               },
               onAdFailedToShowFullScreenContent: (ad, err) {
-                debugPrint('[Rewarded] show failed: ' + err.toString());
+                debugPrint('[Rewarded] show failed: $err');
                 ad.dispose();
                 if (!completer.isCompleted) completer.complete(false);
               },
             );
             ad.show(onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
-              debugPrint('[Rewarded] user earned reward: ' + reward.amount.toString() + ' ' + reward.type);
+              earned = true;
+              debugPrint('[Rewarded] user earned reward: ${reward.amount} ${reward.type}');
               if (!completer.isCompleted) completer.complete(true);
             });
           },
-          onAdFailedToLoad: (LoadAdError error) {
+          onAdFailedToLoad: (LoadAdError error) async {
             debugPrint('[Rewarded] load failed: ${error.code} ${error.message}');
+            if (!retried) {
+              retried = true;
+              await Future.delayed(const Duration(seconds: 2));
+              try {
+                await loadOnce();
+                return;
+              } catch (_) {}
+            }
             if (!completer.isCompleted) completer.complete(false);
           },
         ),
       );
+    }
+
+    try {
+      await loadOnce();
     } catch (_) {
       if (!completer.isCompleted) completer.complete(false);
     }
-    return completer.future;
+
+    // Güvenlik: callback hiç gelmezse akış sonsuza kalmasın.
+    return completer.future.timeout(
+      const Duration(seconds: 120),
+      onTimeout: () => false,
+    );
   }
 
-  // Daily limit helpers
+  static Future<bool> showMultiple({
+    required BuildContext context,
+    required int count,
+    String? key,
+  }) async {
+    if (count <= 0) return true;
+    for (var i = 0; i < count; i++) {
+      final ok = await show(context: context);
+      if (!ok) return false;
+      if (key != null && key.trim().isNotEmpty) {
+        try {
+          await recordOneFor(key);
+        } catch (_) {}
+      }
+    }
+    return true;
+  }
+
+  // Daily limit helpers (limits kaldırıldı)
   static Future<int> remainingToday({int maxPerDay = 3}) async {
-    final sp = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final ymd = '${now.year}-${now.month}-${now.day}';
-    final savedYmd = sp.getString(_kYmd);
-    int count = sp.getInt(_kCount) ?? 0;
-    if (savedYmd != ymd) {
-      count = 0;
-      await sp.setString(_kYmd, ymd);
-      await sp.setInt(_kCount, 0);
-    }
-    final remaining = maxPerDay - count;
-    return remaining < 0 ? 0 : remaining;
+    return 9999;
   }
 
-  static Future<void> recordOne() async {
-    final sp = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final ymd = '${now.year}-${now.month}-${now.day}';
-    final savedYmd = sp.getString(_kYmd);
-    if (savedYmd != ymd) {
-      await sp.setString(_kYmd, ymd);
-      await sp.setInt(_kCount, 1);
-    } else {
-      final count = (sp.getInt(_kCount) ?? 0) + 1;
-      await sp.setInt(_kCount, count);
-    }
+  static Future<void> recordOne() async {}
+
+
+  static Future<int> remainingTodayFor(String key, {required int maxPerDay}) async {
+    return 9999;
   }
+
+  static Future<void> recordOneFor(String key) async {}
 }
-

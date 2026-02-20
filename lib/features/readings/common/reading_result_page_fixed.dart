@@ -142,7 +142,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         final loc = AppLocalizations.of(context);
         final msg = loc.t('reading.countdown.done') != 'reading.countdown.done'
             ? loc.t('reading.countdown.done')
-            : 'Faliniz gecmis kutusuna yonlendirilmistir.';
+            : 'Yorumunuz gecmis kutusuna yonlendirilmistir.';
         Future.microtask(() {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -198,7 +198,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         final loc = AppLocalizations.of(context);
         final msg = loc.t('reading.countdown.done') != 'reading.countdown.done'
             ? loc.t('reading.countdown.done')
-            : 'Faliniz gecmis kutusuna yonlendirilmistir.';
+            : 'Yorumunuz gecmis kutusuna yonlendirilmistir.';
         try {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
         } catch (_) {}
@@ -272,7 +272,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         final loc = AppLocalizations.of(context);
         final msg = loc.t('reading.countdown.done') != 'reading.countdown.done'
             ? loc.t('reading.countdown.done')
-            : 'Faliniz gecmis kutusuna yonlendirilmistir.';
+            : 'Yorumunuz gecmis kutusuna yonlendirilmistir.';
         try { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))); } catch (_) {}
       }
       await Analytics.log('reading_completed', {'type': widget.type, 'stream': true});
@@ -495,7 +495,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
 String _appendPersonalOutro(String type, String locale, String name, String base) {
   String who = name.trim().isEmpty ? 'Sevgili ruh' : name;
   if (type == 'coffee') {
-    final tr = '($who), falinin sonlarina gelirken fincandaki sirlar sessizlesti...\n'
+    final tr = '($who), yorumunun sonlarina gelirken fincandaki sirlar sessizlesti...\n'
         'Ama enerjin hala evrenle konusuyor.\n'
         'Kaderin bir sonraki mesaji icin yeniden bir kahve pisir, niyetini dile ve fincanini hazirla.\n\n'
         'Unutma, her fincan bir anahtar...\n'
@@ -765,7 +765,7 @@ class _DoneInfoBanner extends StatelessWidget {
     final loc = AppLocalizations.of(context);
     final text = loc.t('reading.countdown.done') != 'reading.countdown.done'
         ? loc.t('reading.countdown.done')
-        : 'Falınız geçmiş kutusuna yönlendirilmiştir.';
+        : 'Yorumunuz gecmis kutusuna yonlendirilmistir.';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -796,7 +796,7 @@ class _DoneInfoBannerGold extends StatelessWidget {
     final loc = AppLocalizations.of(context);
     final text = loc.t('reading.countdown.done') != 'reading.countdown.done'
         ? loc.t('reading.countdown.done')
-        : 'Faliniz gecmis kutusuna yonlendirilmistir.';
+        : 'Yorumunuz gecmis kutusuna yonlendirilmistir.';
     const gold = Color(0xFFFFC857);
     return Container(
       width: double.infinity,

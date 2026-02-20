@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color bg = Color(0xFF0B0A0E);
-  static const Color surface = Color(0xFF121018);
+  // Koyu mor tonlar, altın detaylarla uyumlu
+  static const Color bg = Color(0xFF080311); // temel koyu mor
+  static const Color surface = Color(0xFF12051F); // kart / yüzey rengi
   static const Color gold = Color(0xFFD8B982);
   static const Color goldBright = Color(0xFFF3D7A2);
   static const Color muted = Color(0xFFAFA7B8);
@@ -11,14 +12,16 @@ class AppTheme {
   static ThemeData get dark => ThemeData(
         brightness: Brightness.dark,
         primaryColor: gold,
-        scaffoldBackgroundColor: bg,
+        // Tüm sayfaların arkasında yıldızlı görsel görünsün diye Scaffold'u transparan yapıyoruz.
+        scaffoldBackgroundColor: Colors.transparent,
         colorScheme: const ColorScheme.dark(
           primary: gold,
           secondary: violet,
-          surface: bg,
+          surface: surface,
+          background: Colors.transparent,
         ),
         cardTheme: const CardThemeData(
-          surfaceTintColor: Colors.transparent, // M3 kartlardaki ince tint/çerçeveyi kapat
+          surfaceTintColor: Colors.transparent,
         ),
         appBarTheme: const AppBarTheme(
           elevation: 0,

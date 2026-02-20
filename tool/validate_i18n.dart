@@ -30,7 +30,6 @@ void main() {
   final allKeys = <String>{};
   maps.values.forEach((m) => allKeys.addAll(m.keys));
 
-  final baseline = maps['en'] ?? maps.values.first;
   final missing = <String, List<String>>{}; // key -> langs
   for (final k in allKeys) {
     for (final entry in maps.entries) {
@@ -51,4 +50,3 @@ void main() {
   }
   exitCode = 2;
 }
-

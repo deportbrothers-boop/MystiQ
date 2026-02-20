@@ -145,18 +145,6 @@ class LocalAIGenerator {
     return out;
   }
 
-  // Legacy minimal generator used rarely
-  static String _coffeeLegacy(String locale, String name, String dow, Random rnd) {
-    switch (locale) {
-      case 'tr':
-        return '$name, fincandaki izler $dow ritmiyle uyumlu. Kucuk ve somut bir adim bugun iyi gelir.';
-      case 'es':
-        return '$name, las huellas en tu taza reflejan el ritmo de $dow. Un paso pequeno y concreto viene bien.';
-      default:
-        return '$name, the cup patterns mirror the flow of $dow. A small, concrete step fits the day.';
-    }
-  }
-
   // New topic-aware coffee generator (fallback when no template is provided)
   static String _coffee(String locale, String name, String dow, Random rnd, Map<String, dynamic>? extras, Map<String, dynamic> i18n) {
     String i(String key, String fallback) {
@@ -195,14 +183,75 @@ class LocalAIGenerator {
     final t = topicLabel();
 
     if (locale == 'tr') {
-      final intro = i('coffee.intro.tr', '$name, fincan izleri $dow ritmiyle uyumlu. Konu: $t.');
-      final rim = i('coffee.rim.tr', 'Kenar cizgileri tekrar eden bir oruntu gosteriyor; niyetini sade tut.');
-      final base = i('coffee.base.tr', 'Tabanda yogunluk: bugun tek ve somut bir adimi tamamlamak iyi gelir.');
-      final symbol = i('coffee.symbol.tr', 'Silik bir yay: esneklik ve nazik bir donus ivme katar.');
-      final action = i('coffee.action.tr', 'Aksam 3 cumlelik kapanis yaz.');
-      final actionTopic = i('coffee.topic.tr', 'Odak');
-      final closing = i('coffee.closing.tr', 'Not: Eglence amaclidir; sezgini dinle.');
-      return [intro, rim, base, symbol, '$actionTopic: $action', closing].join('\n\n');
+      final user = (extras?['userName']?.toString().trim().isNotEmpty ?? false)
+          ? extras!['userName'].toString().trim()
+          : name;
+      final user2 = (rnd.nextBool() && user.trim().isNotEmpty) ? user.trim() : '';
+
+      final shapes = <List<String>>[
+        ['kuş', 'haberleşme ve ferahlama'],
+        ['yol', 'odak değişimi ve sadeleşme'],
+        ['anahtar', 'küçük bir çözüm kapısı'],
+        ['halka', 'tamamlanma ve sınır'],
+        ['dağ', 'sabır ve iç güç'],
+        ['dalga', 'duygu akışı ve ritim'],
+        ['göz', 'sezgisel uyanıklık'],
+        ['kalp', 'yumuşaklık ve yakınlık ihtiyacı'],
+      ]..shuffle(rnd);
+
+      final a = shapes[0], b = shapes[1], c = shapes[2];
+
+      final openingVariants = <String>[
+        'fincanın genel havası sakin ama canlı; sanki iç dünyanda toparlanma isteği var. Bugünün ritmi $dow gibi: yumuşak ama kararlı.',
+        'fincanın kenarlarında ince akışlar var; düşüncelerin bir araya gelmeye çalıştığı hissi geliyor. $dow ritmi acele etmeden netleşmeyi çağrıştırıyor.',
+        'fincandaki izler dalga dalga; duyguların birikip sonra çözüldüğü gibi. $dow enerjisi küçük ama bilinçli bir odak değişimini destekliyor.',
+        'fincanın tabanı yoğun, ağız kısmı daha açık; zihnin dolu ama niyetin sadeleşmek istiyor. $dow ritmi sakin bir toparlanmayı işaret ediyor gibi.',
+      ];
+
+      final p1 = 'Kahve Yorumu\n\n$user, ${openingVariants[rnd.nextInt(openingVariants.length)]}';
+      final p2 =
+          'Kenar tarafında "${a[0]}" gibi bir iz seçiliyor; bu, ${a[1]} temasını nazikçe hatırlatıyor. '
+          'Orta kısımda "${b[0]}" hissi veren bir çizgi var; ${b[1]} gibi bir çağrışım bırakıyor. '
+          'Tabana yakın yerde "${c[0]}" benzeri bir yoğunluk göze çarpıyor; ${c[1]} sanki öne çıkıyor. '
+          'Bunlar bir kehanet değil; fincandaki şekillerin sembolik ve eğlencelik çağrışımları olarak okunabilir.';
+      final p3 =
+          'Günün teması bence “netleştirme”: bir şeyi büyütmeden önce çerçevesini çizmek. '
+          'İletişimde “az ama öz” yaklaşımı iyi gelebilir; uzun açıklamalar yerine tek cümlelik niyet. '
+          'Duygusal tarafta da yumuşak bir sınır hissi var; hem yakın kalıp hem de kendini korumak gibi.';
+
+      final social = <String>[
+        'Bugün bir kişiye kısa ve içten bir mesaj at; küçük bir temas bile yeterli.',
+        'Bir konuşmayı uzatmadan, tek bir net soru sorarak iletişimi sadeleştir.',
+        'Sosyal enerjini artırmak için kısa bir yürüyüşe birini dahil etmeyi dene.',
+      ];
+      final inner = <String>[
+        '2 dakika gözlerini kapatıp “şu an bende ne ağır?” diye sor; çıkan tek kelimeyi not al.',
+        'Günün sonunda 3 cümlelik bir kapanış yaz: ne hissettim, ne öğrendim, neyi bırakıyorum.',
+        'Niyetini tek cümleye indir ve bunu gün içinde iki kez hatırla.',
+      ];
+
+      final p4 = 'Bugünün Mini Önerileri:\n- ${social[rnd.nextInt(social.length)]}\n- ${inner[rnd.nextInt(inner.length)]}';
+
+      final cta = <String>[
+        'Fincanın sonuna geliyorken, küçük bir detay daha kalmış gibi… Yarın tekrar baktığında izler daha netleşebilir.',
+        'Kahve yorumunun sonuna geliyorken, sanki fincan “ikinci bakış” istiyor… İstersen aynı kahveyi 2. kez yorumlayalım; bazen ikinci bakış daha çok şey söylüyor.',
+        'Bu yorum burada kapanıyor ama fincandaki izler değişir; yeni bir fincanla tekrar geldiğinde kaldığımız yerden devam ederiz.',
+      ];
+      final p5 =
+          '${user2.isNotEmpty ? '$user2, ' : ''}${cta[rnd.nextInt(cta.length)]}\n\nBu içerik eğlence amaçlıdır; kesinlik içermez.';
+
+      var out = [p1, p2, p3, p4, p5].join('\n\n').trim();
+      // Hedef: 900–1500 karakter. Kısa kaldıysa bir paragraf daha ekle.
+      if (out.length < 900) {
+        final extra =
+            'Fincanda bazı boşlukların temiz kalması da önemli; sanki zihnin “yer aç” diyor ve bu, daha rahat nefes alma hissi getiriyor. '
+            'İzlerin birbirine yaklaşması, aynı konuya tekrar dönme eğilimini çağrıştırıyor; ama bu kez daha yumuşak bir bakışla.';
+        out = [p1, '$p2 $extra', p3, p4, p5].join('\n\n').trim();
+      }
+      if (out.length > 1500) {
+        out = [p1, p2, 'Günün teması: netleştirme ve sadeleşme hissi.', p4, p5].join('\n\n').trim();
+      }
+      return out;
     }
 
     // EN (default)
@@ -340,9 +389,9 @@ class LocalAIGenerator {
     }
     if (style == 'analytical') {
       final add = ({
-        'tr': ['\n- Gecmis: ana tema', '- Simdi: odak ve risk', '- Gelecek: tek mikro-adim'],
-        'en': ['\n- Past: main theme', '- Present: focus & risk', '- Future: one micro-step'],
-      }[locale] ?? ['\n- Past: main theme','- Present: focus & risk','- Future: one micro-step']);
+        'tr': ['\n- Tema: ana izlenim', '- Odak: dikkat noktasi', '- Yansima: tek kucuk adim'],
+        'en': ['\n- Theme: main impression', '- Focus: attention point', '- Reflection: one small step'],
+      }[locale] ?? ['\n- Theme: main impression','- Focus: attention point','- Reflection: one small step']);
       return base.trim() + add.join('\n');
     }
     final add = ({
@@ -411,22 +460,20 @@ class LocalAIGenerator {
     ].join('\n');
   }
 
+  // ignore: unused_element
   static String _appendCoffeeOutro(String locale, String base, String name) {
-    String tr = '($name), falinin sonlarina gelirken fincanindaki sirlar sessizlesti...\n'
-        'Ama enerjin hala evrenle konusuyor.\n'
-        'Kaderin bir sonraki mesaji icin yeniden bir kahve pisir, niyetini dile ve fincanini hazirla.\n\n'
-        'Unutma, her fincan bir anahtar...\n'
-        'Ve bir sonraki kapiyi sadece MystiQ\'te acabilirsin.';
-    String en = '($name), as the cup grows quiet, its secrets settle...\n'
-        'Yet your energy is still in dialogue with the universe.\n'
-        'For the next message of fate, brew another coffee, set your intention, and prepare your cup.\n\n'
-        'Remember, every cup is a key...\n'
-        'And the next door opens only on MystiQ.';
-    String es = '($name), hacia el final la taza se aquieta y sus secretos reposan...\n'
-        'Pero tu energia sigue conversando con el universo.\n'
-        'Para el proximo mensaje del destino, prepara otro cafe, formula tu intencion y alista tu taza.\n\n'
-        'Recuerda: cada taza es una llave...\n'
-        'Y la proxima puerta se abre solo en MystiQ.';
+    String tr = '($name), fincandaki izler yumusak bir izlenim veriyor.\n'
+        'Semboller bugune dair tematik cagrisimlar sunabilir.\n'
+        'Niyetini bir cumleyle sadeleştirip kisaca not alabilirsin.\n\n'
+        'Bu yorum sembolik ve eglence amaclidir.';
+    String en = '($name), the cup traces suggest gentle impressions.\n'
+        'These symbols can be read as thematic echoes of the moment.\n'
+        'You can summarize your intention in one sentence and note it.\n\n'
+        'This reading is symbolic and for entertainment.';
+    String es = '($name), las huellas en la taza sugieren impresiones suaves.\n'
+        'Estos simbolos pueden leerse como ecos tematicos del momento.\n'
+        'Puedes resumir tu intencion en una frase y anotarla.\n\n'
+        'Esta lectura es simbolica y para entretenimiento.';
     final pick = ({'tr': tr, 'es': es, 'en': en}[locale]) ?? tr;
     return base.trim() + '\n\n' + pick;
   }

@@ -66,16 +66,51 @@ function buildPrompt({ type, profile, inputs, locale }) {
   const cards = Array.isArray(inputs?.cards) ? inputs.cards.join(', ') : '';
   const dow = new Date().toLocaleDateString(locale || 'tr', { weekday: 'long' });
 
-  // Minimal guidance: ask for a pure reading, in the requested language, no extra sections or meta.
-  const sys = `You are MystiQ's ${type || 'fortune'} assistant. Produce only the reading text in ${langName}. Do not add headings, disclaimers, or meta comments.`;
+  const coffeePolicyTr =
+    'MYSTIQ – Kahve Yorumu ÇIKTI KURALLARI (GÜNCEL)\n' +
+    'ZORUNLU KURALLAR\n' +
+    '1) Kullanıcı adı mutlaka geçmeli:\n' +
+    '- İlk paragrafta 1 kez: “{userName}, …”\n' +
+    '- Metin boyunca toplam 1–2 kez geçsin.\n' +
+    '2) Metin uzun olmalı:\n' +
+    '- 900–1500 karakter (yaklaşık 140–230 kelime).\n' +
+    '- 4–5 kısa paragraf halinde akıcı anlatım.\n' +
+    '3) Ton:\n' +
+    '- Sıcak, samimi, sezgisel.\n' +
+    '- Kesin hüküm yok; “olacak/kesin/garanti/mutlaka” yok.\n' +
+    '- Gelecek tahmini / kehanet yok. Yönlendirme ve içgörü dili.\n' +
+    '4) İçerik yapısı (bu sırayla):\n' +
+    'A) Açılış: isim + fincanın genel havası + gün/ritim\n' +
+    'B) Detaylı gözlem: 2–3 iz/şekil + yorum\n' +
+    'C) Günün teması\n' +
+    'D) Mini öneriler: 2 öneri (1 sosyal, 1 içsel) — 2 satır\n' +
+    'E) Kapanış + geri çağırma CTA\n' +
+    '5) Kapanış CTA (ZORUNLU): “kahve yorumunun/fincanın sonuna geliyorken” hissi + tekrar çağır.\n' +
+    'FORMAT\n' +
+    'Başlık: “Kahve Yorumu”\n' +
+    'Alt bölüm:\n' +
+    '“Bugünün Mini Önerileri:”\n' +
+    '- ...\n' +
+    '- ...\n' +
+    'En alt: “Bu içerik eğlence amaçlıdır; kesinlik içermez.”\n';
+
+  // System prompt: allow heading/sections only for coffee; otherwise keep minimal.
+  let sys = (type === 'coffee')
+    ? `Sen MystiQ için kahve sembolü yorumlayıcısısın. ${coffeePolicyTr}`
+    : `You are MystiQ's ${type || 'reading'} assistant. Produce only the reading text in ${langName}. Do not add headings, disclaimers, or meta comments.`;
+  const styleHintTr = (inputs?.styleHintTr || '').toString().trim();
+  if (type === 'coffee') {
+    sys += ' Gelecek hakkında tahmin yapma. Tarih verme. Kesinlik iddiasında bulunma. “Olacak” yerine “gibi/hissi/çağrıştırıyor” kullan.';
+  }
+  if (styleHintTr) sys += ` ${styleHintTr}`;
 
   // Provide raw context by type without stylistic shaping.
   let user;
   switch (type) {
     case 'coffee':
       user = lang.startsWith('tr')
-        ? `Kahve fali. Gun: ${dow}. ${topic ? `Konu: ${topic}. ` : ''}${style ? `Stil: ${style}. ` : ''}${name ? `Isim: ${name}.` : ''}`
-        : `Coffee reading. Day: ${dow}. ${topic ? `Topic: ${topic}. ` : ''}${style ? `Style: ${style}. ` : ''}${name ? `Name: ${name}.` : ''}`;
+        ? `Kahve yorumu. Gün: ${dow}. ${topic ? `Konu: ${topic}. ` : ''}${style ? `Stil: ${style}. ` : ''}${name ? `Kullanıcı adı: ${name}. ` : ''}${inputs?.prevIntroSig ? `Önceki giriş kalıbı: ${inputs.prevIntroSig}. ` : ''}Kurallara birebir uy.`
+        : `Coffee reading. Day: ${dow}. ${topic ? `Topic: ${topic}. ` : ''}${style ? `Style: ${style}. ` : ''}${name ? `User name: ${name}. ` : ''}`;
       break;
     case 'tarot':
       user = lang.startsWith('tr')
@@ -84,7 +119,7 @@ function buildPrompt({ type, profile, inputs, locale }) {
       break;
     case 'palm':
       user = lang.startsWith('tr')
-        ? `El fali. Gun: ${dow}. ${style ? `Stil: ${style}. ` : ''}${name ? `Isim: ${name}.` : ''}`
+        ? `El cizgisi yorumu. Gun: ${dow}. ${style ? `Stil: ${style}. ` : ''}${name ? `Isim: ${name}.` : ''}`
         : `Palm reading. Day: ${dow}. ${style ? `Style: ${style}. ` : ''}${name ? `Name: ${name}.` : ''}`;
       break;
     case 'dream':
@@ -125,10 +160,20 @@ app.post('/generate', async (req, res) => {
     if (!client) return res.status(503).json({ error: 'missing_api_key' });
     const { type, profile, inputs, locale, model } = req.body || {};
     const { sys, user } = buildPrompt({ type, profile, inputs, locale });
-    const temp = (type === 'dream') ? 0.3 : 0.7;
+    const temp = (typeof req.body?.temperature === 'number')
+      ? req.body.temperature
+      : ((type === 'dream') ? 0.3 : 0.85);
+    const presence = (typeof req.body?.presence_penalty === 'number')
+      ? req.body.presence_penalty
+      : (type === 'coffee' ? 0.9 : 0.6);
+    const frequency = (typeof req.body?.frequency_penalty === 'number')
+      ? req.body.frequency_penalty
+      : (type === 'coffee' ? 0.4 : 0.2);
     const r = await client.chat.completions.create({
       model: model || 'gpt-4o-mini',
       temperature: temp,
+      presence_penalty: presence,
+      frequency_penalty: frequency,
       messages: [
         { role: 'system', content: sys },
         { role: 'user', content: user }
@@ -157,10 +202,20 @@ app.post('/stream', async (req, res) => {
     }
     const { type, profile, inputs, locale, model } = req.body || {};
     const { sys, user } = buildPrompt({ type, profile, inputs, locale });
-    const temp = (type === 'dream') ? 0.3 : 0.7;
+    const temp = (typeof req.body?.temperature === 'number')
+      ? req.body.temperature
+      : ((type === 'dream') ? 0.3 : 0.85);
+    const presence = (typeof req.body?.presence_penalty === 'number')
+      ? req.body.presence_penalty
+      : (type === 'coffee' ? 0.9 : 0.6);
+    const frequency = (typeof req.body?.frequency_penalty === 'number')
+      ? req.body.frequency_penalty
+      : (type === 'coffee' ? 0.4 : 0.2);
     const stream = await client.chat.completions.create({
       model: model || 'gpt-4o-mini',
       temperature: temp,
+      presence_penalty: presence,
+      frequency_penalty: frequency,
       stream: true,
       messages: [
         { role: 'system', content: sys },

@@ -6,16 +6,24 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
 import '../../profile/profile_controller.dart';
+import '../../profile/user_profile.dart';
 import '../../../core/ai/ai_service.dart';
-import '../../../core/readings/pending_readings_service2.dart' as pending2;
+import '../../../core/ai/local_generator.dart';
+import '../../../core/readings/pending_readings_service_fixed.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../tarot/tarot_deck_fixed.dart';
 import '../../../common/widgets/sharp_image.dart';
+import '../../../core/entitlements/entitlements_controller.dart';
+import '../../../core/access/sku_costs.dart';
+import '../../../core/ads/ad_service.dart';
+import '../../../core/access/ai_generation_guard.dart';
+import '../../../core/ads/rewarded_helper.dart';
 
 class ReadingResultPage extends StatefulWidget {
   final String type; // coffee | tarot | palm | dream | astro
@@ -38,6 +46,62 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
   bool _deferGenerate = false;
   bool _doneSnackShown = false;
   bool _streaming = false;
+  bool _speedupUsed = false;
+  bool _speedingUp = false;
+
+  bool _isAiFailure(String s) => s.trim().startsWith('Uretim su anda yapilamiyor');
+
+  static const Duration _coffeeInitialEta = Duration(minutes: 10);
+  static const Duration _speedupTargetEta = Duration(minutes: 5);
+
+  bool _shouldBackToHome() {
+    // Kahve yorumunun geri sayım ekranında geri tuşu ana menüye dönsün.
+    final left = (_remainingSeconds ?? 0);
+    if (widget.type != 'coffee') return false;
+    if (left <= 0) return false;
+    return true;
+  }
+
+  void _goHome() {
+    try {
+      context.go('/home');
+    } catch (_) {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    }
+  }
+
+  String _fallbackText({required UserProfile profile, required String locale}) {
+    try {
+      return LocalAIGenerator.generate(
+        type: widget.type,
+        profile: profile,
+        extras: widget.requestExtras,
+        locale: locale,
+      );
+    } catch (_) {
+      if (widget.type == 'coffee') {
+        final name = profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
+        return 'Kahve Yorumu\n\n$name, fincandaki şekiller sembolik çağrışımlar veriyor.\n\nBugünün Mini Önerileri:\n- Bugün kısa bir mesajla bağ kur.\n- 2 dakika nefesle sakinleş.\n\nFincanın sonuna geliyorken, yeni bir fincanla tekrar geldiğinde kaldığımız yerden devam ederiz.\n\nBu içerik eğlence amaçlıdır; kesinlik içermez.';
+      }
+      return 'Yorum şu an oluşturulamadı; biraz sonra tekrar deneyebilirsin.\n\nBu içerik eğlence amaçlıdır; kesinlik içermez.';
+    }
+  }
+
+  Future<void> _refundCoinsIfNeeded() async {
+    try {
+      final ent = context.read<EntitlementsController>();
+      if (ent.lastUnlockMethod != 'coins') return;
+      int cost = 0;
+      switch (widget.type) {
+        case 'dream': cost = SkuCosts.dream; break;
+        case 'tarot': cost = SkuCosts.tarotDeep; break;
+        case 'coffee': cost = SkuCosts.coffeeFast; break;
+        case 'palm': cost = SkuCosts.palmPremium; break;
+        default: return;
+      }
+      await ent.addCoins(cost);
+    } catch (_) {}
+  }
 
   @override
   void initState() {
@@ -47,8 +111,12 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     if (widget.providedText != null) {
       text = widget.providedText!;
       _placeholderProvided = _looksLikePlaceholder(text);
+      if (widget.type == 'coffee' && !_placeholderProvided) {
+        text = AiService.postProcessCoffeeText(text);
+      }
       _saved = !_placeholderProvided;
-      if (_placeholderProvided && (widget.requestExtras == null || (widget.requestExtras?.isEmpty ?? true))) {
+      final hasPermit = ((widget.requestExtras?['permit'] ?? '').toString().trim().isNotEmpty);
+      if (_placeholderProvided && hasPermit) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _generateAndSave());
       }
     } else {
@@ -84,8 +152,17 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       final pendingId = e['pendingId'] as String?;
       if (pendingId != null) {
         try {
-          final it = await pending2.PendingReadingsService2.getById(pendingId);
+          final used = await PendingReadingsService.isSpeedupUsed(pendingId);
+          if (mounted) setState(() => _speedupUsed = used);
+        } catch (_) {}
+        try {
+          final it = await PendingReadingsService.getById(pendingId);
           final ra = DateTime.tryParse((it?['readyAt'] as String?) ?? '');
+          if (mounted) {
+            setState(() {
+              _pendingId = pendingId;
+            });
+          }
           if (ra != null && (target == null || ra.isAfter(DateTime.now()))) {
             target = ra;
           }
@@ -97,6 +174,63 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       _countdown?.cancel();
       _countdown = Timer.periodic(const Duration(seconds: 1), (_) => _tickCountdown());
     } catch (_) {}
+  }
+
+  Future<void> _speedUpToFiveMinutes() async {
+    final id = _pendingId;
+    if (id == null || id.isEmpty) return;
+    final left = _remainingSeconds ?? 0;
+    if (left <= _speedupTargetEta.inSeconds) return;
+    if (_speedingUp || _speedupUsed) return;
+
+    setState(() => _speedingUp = true);
+    try {
+      final ok = await RewardedAds.show(context: context);
+      if (!mounted) return;
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reklam gösterilemedi. Tekrar deneyin.')),
+        );
+        return;
+      }
+
+      // Re-check from storage so re-entry / multiple taps can't bypass the one-time rule.
+      final alreadyUsed = await PendingReadingsService.isSpeedupUsed(id);
+      if (alreadyUsed) {
+        if (mounted) setState(() => _speedupUsed = true);
+        return;
+      }
+
+      String locale = 'tr';
+      try {
+        locale = Localizations.localeOf(context).languageCode;
+      } catch (_) {}
+
+      final newReadyAt = DateTime.now().add(_speedupTargetEta);
+      try {
+        await PendingReadingsService.updateReadyAt(
+          id: id,
+          type: widget.type,
+          readyAt: newReadyAt,
+          locale: locale,
+        );
+      } catch (_) {}
+      try {
+        await PendingReadingsService.markSpeedupUsed(id);
+      } catch (_) {}
+
+      if (!mounted) return;
+      setState(() {
+        _readyAt = newReadyAt;
+        _speedupUsed = true;
+      });
+      _tickCountdown();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hızlandırıldı: Sonuç ~5 dk içinde hazır.')),
+      );
+    } finally {
+      if (mounted) setState(() => _speedingUp = false);
+    }
   }
 
   void _tickCountdown() {
@@ -117,7 +251,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         final loc = AppLocalizations.of(context);
         final msg = loc.t('reading.countdown.done') != 'reading.countdown.done'
             ? loc.t('reading.countdown.done')
-            : 'Faliniz gecmis kutusuna yonlendirilmistir.';
+            : 'Yorumunuz gecmis kutusuna yonlendirilmistir.';
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       }
     }
@@ -131,6 +265,29 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     String titleSafe;
     try { titleSafe = titleTr(context, widget.type); } catch (_) { titleSafe = _title(widget.type); }
 
+    // If a background pending job already completed, prefer the saved history text
+    // to avoid a second AI call (and permit re-consumption).
+    final pid = _pendingId ?? (extras['pendingId'] as String?);
+    if (pid != null && pid.isNotEmpty) {
+      try {
+        final hc = context.read<HistoryController>();
+        final existing = hc.items.firstWhere((e) => e.id == pid);
+        if (!_looksLikePlaceholder(existing.text)) {
+          var readyText = existing.text;
+          if (widget.type == 'coffee') {
+            readyText = AiService.postProcessCoffeeText(readyText);
+          } else if (widget.type == 'tarot') {
+            readyText = _appendTarotOutro(readyText, profile.name);
+          }
+          if (!mounted) return;
+          setState(() { text = readyText; _saved = true; _placeholderProvided = false; _streaming = false; });
+          try { await PendingReadingsService.cancel(pid); } catch (_) {}
+          _pendingId = null;
+          return;
+        }
+      } catch (_) {}
+    }
+
     try {
       var generated = await AiService.generate(
         type: widget.type,
@@ -139,10 +296,12 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         locale: locale,
       );
 
+      if (generated.trim().isEmpty || _isAiFailure(generated)) {
+        generated = _fallbackText(profile: profile, locale: locale);
+      }
+
       if (widget.type == 'coffee') {
-        generated = _normalizeCoffeeText(generated);
-        final name = profile.name;
-        generated = _appendCoffeeOutro(generated, name);
+        generated = AiService.postProcessCoffeeText(generated);
       } else if (widget.type == 'tarot') {
         final name = profile.name;
         generated = _appendTarotOutro(generated, name);
@@ -151,7 +310,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       if (!mounted) {
         // Persist in background even if page is closed
         await _persistDirectOrProvider(titleSafe, generated);
-        try { if (_pendingId != null) await pending2.PendingReadingsService2.cancel(_pendingId!); } catch (_) {}
+        try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
         _pendingId = null;
         try { await Analytics.log('reading_completed', {'type': widget.type, 'bg': true}); } catch (_) {}
         return;
@@ -164,23 +323,73 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         final loc = AppLocalizations.of(context);
         final msg = loc.t('reading.countdown.done') != 'reading.countdown.done'
             ? loc.t('reading.countdown.done')
-            : 'Faliniz gecmis kutusuna yonlendirilmistir.';
+            : 'Yorumunuz gecmis kutusuna yonlendirilmistir.';
         try { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))); } catch (_) {}
       }
-      try { if (_pendingId != null) await pending2.PendingReadingsService2.cancel(_pendingId!); } catch (_) {}
+      try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
       _pendingId = null;
       try { await Analytics.log('reading_completed', {'type': widget.type}); } catch (_) {}
+    } on AiGenerationGuardException catch (_) {
+      // Permit missing or already consumed: do not attempt fallback generation.
+      // If history has the final text it will be shown via the early-return above.
+      if (!mounted) return;
+      final l = AppLocalizations.of(context);
+      final msg = l.t('error.generic') != 'error.generic'
+          ? l.t('error.generic')
+          : 'Bu işlem için önce erişim alınması gerekiyor.';
+      try { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))); } catch (_) {}
+      return;
     } catch (_) {
-      final generated = 'Uretim su anda yapilamiyor. Lutfen biraz sonra tekrar dene.';
+      final generated = _fallbackText(profile: profile, locale: locale);
       if (!mounted) {
         await _persistDirectOrProvider(titleSafe, generated);
+        try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
+        _pendingId = null;
         return;
       }
       setState(() { text = generated; _streaming = false; });
       await _saveToHistory();
+      try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
+      _pendingId = null;
+      return;
     }
   }
 
+  String _userName() {
+    try {
+      final p = context.read<ProfileController>().profile;
+      final n = p.name.trim();
+      return n.isNotEmpty ? n : 'Dostum';
+    } catch (_) {
+      return 'Dostum';
+    }
+  }
+
+  bool _shouldShowReengagementCta(String currentText) {
+    if (currentText.trim().isEmpty) return false;
+    // Coffee already includes a strict outro; avoid duplicating.
+    if (widget.type == 'coffee') return false;
+    return true;
+  }
+
+  String _reengagementCtaText() {
+    final name = _userName();
+    final prefix = name.isNotEmpty ? '$name, ' : '';
+    switch (widget.type) {
+      case 'tarot':
+        return '${prefix}kartların sonuna gelirken küçük bir detay daha kaldı… İstersen aynı açılımı 2. kez yorumlayalım; bazen ikinci bakış daha çok şey söyler.';
+      case 'dream':
+        return '${prefix}rüyanın sonuna gelirken küçük bir iz daha beliriyor… İstersen aynı rüyayı 2. kez yorumlayalım; bazen ikinci bakış duyguyu daha net yakalar.';
+      case 'palm':
+        return '${prefix}çizgilerin sonuna gelirken küçük bir ayrıntı daha var… İstersen aynı eli 2. kez yorumlayalım; bazen ikinci bakış daha fazla ipucu taşır.';
+      case 'astro':
+        return '${prefix}günün yorumunu kapatırken küçük bir detay daha kaldı… Yarın tekrar geldiğinde ritim daha netleşebilir.';
+      default:
+        return '${prefix}yorumun sonuna gelirken küçük bir detay daha kaldı… Yeniden baktığında resim daha netleşebilir.';
+    }
+  }
+
+  // ignore: unused_element
   String _normalizeCoffeeText(String s) {
     // Remove markdown bold/italic markers
     var out = s.replaceAll(RegExp(r"\*\*(.*?)\*\*"), r"$1");
@@ -195,29 +404,11 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     return out.trim();
   }
 
-  String _appendCoffeeOutro(String base, String name) {
-    final who = name.trim().isEmpty ? '' : (name.trim() + ', ');
-    const outro =
-        'falinin sonlarina gelirken fincanindaki sekiller son bir kez konustu...\n'
-        'Diyorlar ki: "Bu sadece baslangic."\n\n'
-        'Her kahve yeni bir yol, her niyet yeni bir kapidir.\n'
-        'Simdi derin bir nefes al, kalbinden dilegini gecir ve MystiQ\'e geri don...\n'
-        'Evren seninle konusmaya devam etmek istiyor.';
-    final header = who.isEmpty ? '' : who;
-    final add = header + outro;
-    final trimmed = base.trimRight();
-    if (trimmed.endsWith(outro)) return base; // already added
-    return trimmed + '\n\n' + add;
-  }
-
   String _appendTarotOutro(String base, String name) {
     final who = name.trim().isEmpty ? '' : (name.trim() + ', ');
     const outro =
-        'falinin sonlarina gelirken tarot kartindaki sekiller son bir kez konustu...\n'
-        'Diyorlar ki: "Bu sadece baslangic."\n\n'
-        'Her sectigin kart yeni bir yol, her niyet yeni bir kapidir.\n'
-        'Simdi derin bir nefes al, kalbinden dilegini gecir ve MystiQ\'e geri don...\n'
-        'Evren seninle konusmaya devam etmek istiyor.';
+        'kartlardaki semboller, tematik bir bakisla yorumlanabilir.\n'
+        'Bu yorum eglence amaclidir; kendi sezgini de referans al.';
     final header = who.isEmpty ? '' : who;
     final add = header + outro;
     final trimmed = base.trimRight();
@@ -307,9 +498,17 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
             .toList()
         : null;
 
-    return Scaffold(
+    final backToHome = _shouldBackToHome();
+
+    final page = Scaffold(
       appBar: AppBar(
         title: Text(loc.t('reading.result.title')),
+        leading: backToHome
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _goHome,
+              )
+            : null,
         actions: [
           if (entryId != null)
             IconButton(
@@ -331,9 +530,13 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+      bottomNavigationBar: const SafeArea(top: false, child: AdBanner()),
+      body: SafeArea(
+        // Alt sistem gezinme çubuğu (gesture/3‑buton) üstünde kalması için
+        minimum: const EdgeInsets.only(bottom: 16),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(titleTr(context, widget.type), style: Theme.of(context).textTheme.titleLarge),
@@ -343,7 +546,12 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
             ],
             if ((_remainingSeconds ?? 0) > 0) ...[
               const SizedBox(height: 6),
-              _EtaBadge(seconds: _remainingSeconds!),
+              Row(
+                children: [
+                  _EtaBadge(seconds: _remainingSeconds!),
+                  const SizedBox(width: 8),
+                ],
+              ),
             ],
             // Coffee sonucu hazir olana kadar bilgilendirici metin
             if (widget.type == 'coffee' && text.isEmpty) ...[
@@ -351,7 +559,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
               Text(
                 AppLocalizations.of(context).t('coffee.waiting') != 'coffee.waiting'
                     ? AppLocalizations.of(context).t('coffee.waiting')
-                    : 'Kahve faliniz hazirlaniyor, lutfen bekleyiniz...',
+                    : 'Kahve yorumunuz hazırlanıyor, lütfen bekleyiniz...',
                 style: const TextStyle(color: Colors.white70),
               ),
             ],
@@ -361,7 +569,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
               Text(
                 AppLocalizations.of(context).t('palm.waiting') != 'palm.waiting'
                     ? AppLocalizations.of(context).t('palm.waiting')
-                    : 'El faliniza bakiliyor, lutfen bekleyin... ',
+                    : 'El çizgisi yorumunuz hazırlanıyor, lütfen bekleyin...',
                 style: const TextStyle(color: Colors.white70),
               ),
             ],
@@ -371,7 +579,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
               Text(
                 AppLocalizations.of(context).t('tarot.waiting') != 'tarot.waiting'
                     ? AppLocalizations.of(context).t('tarot.waiting')
-                    : 'Tarot faliniz hazirlaniyor, lutfen bekleyin...',
+                    : 'Tarot yorumunuz hazırlanıyor, lütfen bekleyin...',
                 style: const TextStyle(color: Colors.white70),
               ),
             ],
@@ -381,7 +589,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
               Text(
                 AppLocalizations.of(context).t('astro.waiting') != 'astro.waiting'
                     ? AppLocalizations.of(context).t('astro.waiting')
-                    : 'Gunluk burc yorumunuz hazirlaniyor, lutfen bekleyiniz...',
+                    : 'Günlük burç yorumunuz hazırlanıyor, lütfen bekleyiniz...',
                 style: const TextStyle(color: Colors.white70),
               ),
             ],
@@ -389,9 +597,43 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
             Expanded(
               child: text.isEmpty
                   ? const _ShimmerParagraph()
-                  : SingleChildScrollView(child: SelectableText(text)),
+                  : SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SelectableText(text),
+                          if (_shouldShowReengagementCta(text)) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              _reengagementCtaText(),
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
             ),
             const SizedBox(height: 8),
+            if (text.isEmpty &&
+                (_remainingSeconds ?? 0) > _speedupTargetEta.inSeconds &&
+                _pendingId != null &&
+                !_speedupUsed) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _speedingUp ? null : _speedUpToFiveMinutes,
+                  icon: _speedingUp
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.rocket_launch, size: 18),
+                  label: const Text('Reklam izle • 5 dk’ya hızlandır'),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             Row(
               children: [
                 ElevatedButton(
@@ -401,13 +643,31 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
                 const SizedBox(width: 12),
                 OutlinedButton(
                   onPressed: () => Navigator.of(context).maybePop(),
-                  child: Text(loc.t('reading.again')),
+                  child: Text(loc.t('action.close')),
                 ),
               ],
-            )
+            ),
+            if (widget.type == 'coffee') ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Bu içerik eğlence amaçlıdır. Kesinlik içermez.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ],
           ],
         ),
+        ),
       ),
+    );
+
+    if (!backToHome) return page;
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) _goHome();
+      },
+      child: page,
     );
   }
 
@@ -425,16 +685,16 @@ bool _looksLikePlaceholder(String t) {
   final s = t.toLowerCase().trim();
   if (s.isEmpty) return true;
   if (s.length < 24) return true;
-  return s.contains('hazir') || s.contains('hazÄ±r') || s.contains('prepar') || s.contains('loading');
+  return s.contains('hazir') || s.contains('hazır') || s.contains('prepar') || s.contains('loading');
 }
 
 String _title(String t) {
   switch (t) {
-    case 'coffee': return 'Coffee';
+    case 'coffee': return 'Kahve Yorumu';
     case 'tarot': return 'Tarot';
-    case 'palm': return 'Palm';
-    case 'dream': return 'Dream';
-    case 'astro': return 'Astro';
+    case 'palm': return 'El Çizgisi Yorumu';
+    case 'dream': return 'Rüya Tabiri';
+    case 'astro': return 'Astroloji';
     default: return 'MystiQ';
   }
 }
@@ -526,7 +786,29 @@ class _EtaBadge extends StatelessWidget {
 }
 
 // Test helper retained for existing tests
-String ensureMinLengthForTest(BuildContext ctx, String type, String base) => base.trim();
+String ensureMinLengthForTest(BuildContext ctx, String type, String base) => _ensureMinLength(ctx, base);
+
+String _ensureMinLength(BuildContext ctx, String base) {
+  final t = base.trim();
+  if (t.length >= 24) return t;
+  int energy = 70;
+  try {
+    energy = ctx.read<EntitlementsController>().energy;
+  } catch (_) {}
+
+  final loc = AppLocalizations.of(ctx);
+  final key = energy < 40
+      ? 'energy.generic.low'
+      : (energy < 80 ? 'energy.generic.med' : 'energy.generic.high');
+  final hint = loc.t(key);
+  final safeHint = hint != key
+      ? hint
+      : (Localizations.localeOf(ctx).languageCode == 'tr'
+          ? 'Enerji: küçük bir nefes + tek niyetle başla.'
+          : 'Low energy: one breath and one intention.');
+
+  return '$t\n\n$safeHint';
+}
 
 class _TarotFrontRow extends StatelessWidget {
   final List<int> indices;

@@ -2,9 +2,11 @@
 import '../../../core/i18n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/access/access_gate.dart';
+import '../../../core/access/ai_generation_guard.dart';
 import '../../../core/access/sku_costs.dart';
 import 'package:provider/provider.dart';
 import '../../../core/ai/ai_service.dart';
+import '../../../core/ads/rewarded_helper.dart';
 import '../../profile/profile_controller.dart';
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
@@ -18,7 +20,50 @@ class DreamPage extends StatefulWidget {
 
 class _DreamPageState extends State<DreamPage> {
   final ctrl = TextEditingController();
+  static const String _prefix = 'RÜYAMDA ';
+  bool _handlingPrefix = false;
   String _style = 'practical'; // 'poetic' | 'practical' (but hidden UI)
+
+  @override
+  void initState() {
+    super.initState();
+    ctrl.text = _prefix;
+    ctrl.selection = const TextSelection.collapsed(offset: _prefix.length);
+    ctrl.addListener(_enforcePrefix);
+  }
+
+  @override
+  void dispose() {
+    ctrl.removeListener(_enforcePrefix);
+    ctrl.dispose();
+    super.dispose();
+  }
+
+  void _enforcePrefix() {
+    if (_handlingPrefix) return;
+    _handlingPrefix = true;
+    final text = ctrl.text;
+    final sel = ctrl.selection;
+
+    String newText = text;
+    TextSelection newSelection = sel;
+
+    // Metin RÜYAMDA ile başlamıyorsa, prefix'i tekrar ekle.
+    if (!text.startsWith(_prefix)) {
+      final withoutPrefix = text.replaceAll(_prefix, '');
+      newText = '$_prefix$withoutPrefix';
+      var offset = sel.baseOffset;
+      if (offset < _prefix.length) offset = _prefix.length;
+      if (offset > newText.length) offset = newText.length;
+      newSelection = TextSelection.collapsed(offset: offset);
+    } else if (sel.baseOffset < _prefix.length) {
+      // İmlecin prefix'in soluna gitmesine izin verme.
+      newSelection = const TextSelection.collapsed(offset: _prefix.length);
+    }
+
+    ctrl.value = TextEditingValue(text: newText, selection: newSelection);
+    _handlingPrefix = false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,68 +84,33 @@ class _DreamPageState extends State<DreamPage> {
             ),
             const SizedBox(height: 10),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                // Unified flow: schedule + countdown for all readings
-                await _startDream(context);
-                return;
-                final ok = await AccessGate.ensureAccessOrPaywall(
-                  context,
-                  sku: 'reading.dream',
-                  coinCost: SkuCosts.dream,
-                );
-                if (ok && context.mounted) {
-                  // Yorumu hemen Ã¼ret ve geÃ§miÅŸe kaydet; sonra Result'a gÃ¶nder
-                  final profile = context.read<ProfileController>().profile;
-                  final locale = Localizations.localeOf(context).languageCode;
-                  final generated = await AiService.generate(
-                    type: 'dream',
-                    profile: profile,
-                    extras: {'text': ctrl.text},
-                    locale: locale,
-                  );
-                  try {
-                    final hc = context.read<HistoryController>();
-                    final entry = HistoryEntry(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      type: 'dream',
-                      title: AppLocalizations.of(context).t('dream.title'),
-                      text: generated,
-                      createdAt: DateTime.now(),
-                    );
-                    await hc.add(entry);
-                    if (!context.mounted) return;
-                    context.push('/reading/result/dream', extra: entry);
-                  } catch (_) {
-                    if (!context.mounted) return;
-                    context.push('/reading/result/dream', extra: {
-                      'text': generated,
-                    });
-                  }
-                }
-              },
-              child: Builder(builder: (ctx) {
-                final ent = ctx.watch<EntitlementsController>();
-                final cost = (ent.isPremium || !ent.firstFreeUsed) ? 0 : SkuCosts.dream;
-                final loc = AppLocalizations.of(context);
-                final reason = ent.isPremium
-                    ? (loc.t('premium.free_reason') != 'premium.free_reason' ? loc.t('premium.free_reason') : 'Premium: 0 coin')
-                    : (loc.t('first_free.reason') != 'first_free.reason' ? loc.t('first_free.reason') : 'Ä°lk fal Ã¼cretsiz: 0 coin');
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(AppLocalizations.of(context).t('dream.cta')),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.monetization_on_outlined, size: 16),
-                    const SizedBox(width: 2),
-                    Text('$cost'),
-                    if (cost == 0) ...[
-                      const SizedBox(width: 6),
-                      Tooltip(message: reason, child: const Icon(Icons.info_outline, size: 16)),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async => _startDream(context, viaAd: true),
+                icon: const Icon(Icons.play_circle_outline, size: 18),
+                label: const Text('2 Reklam izle, Yorum Al'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () async => _startDream(context, viaAd: false),
+                child: Builder(builder: (ctx) {
+                  final cost = SkuCosts.dream;
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(AppLocalizations.of(context).t('dream.cta')),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.monetization_on_outlined, size: 16),
+                      const SizedBox(width: 2),
+                      Text('$cost'),
                     ],
-                  ],
-                );
-              })
+                  );
+                }),
+              ),
             ),
           ],
         ),
@@ -110,13 +120,23 @@ class _DreamPageState extends State<DreamPage> {
 }
 
 extension on _DreamPageState {
-  Future<void> _startDream(BuildContext context) async {
-    final ok = await AccessGate.ensureAccessOrPaywall(
-      context,
-      sku: 'reading.dream',
-      coinCost: SkuCosts.dream,
-    );
-    if (!ok || !context.mounted) return;
+  Future<void> _startDream(BuildContext context, {required bool viaAd}) async {
+    String permit = '';
+    if (viaAd) {
+      final okAd = await RewardedAds.showMultiple(context: context, count: 2, key: 'dream');
+      if (!okAd || !context.mounted) {
+        final msg = AppLocalizations.of(context).t('tarot.fast.ad_failed') != 'tarot.fast.ad_failed'
+            ? AppLocalizations.of(context).t('tarot.fast.ad_failed')
+            : 'Reklam gosterilemedi. Tekrar deneyin.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        return;
+      }
+      permit = await AiGenerationGuard.issuePermit();
+    } else {
+      final ok = await AccessGate.ensureCoinsOnlyOrPaywall(context, coinCost: SkuCosts.dream);
+      if (!ok || !context.mounted) return;
+      permit = await AiGenerationGuard.issuePermit();
+    }
 
     try {
       final profile = context.read<ProfileController>().profile;
@@ -124,9 +144,23 @@ extension on _DreamPageState {
       final generated = await AiService.generate(
         type: 'dream',
         profile: profile,
-        extras: {'text': ctrl.text, 'style': _style},
+        extras: {'text': ctrl.text, 'style': _style, 'permit': permit},
         locale: locale,
       );
+      // If AI failed after consuming coins, refund and stop here
+      if (generated.startsWith('Uretim su anda yapilamiyor')) {
+        final entNow = context.read<EntitlementsController>();
+        if (entNow.lastUnlockMethod == 'coins') {
+          try { await entNow.addCoins(SkuCosts.dream); } catch (_) {}
+        }
+        if (context.mounted) {
+          final msg = AppLocalizations.of(context).t('error.ai_unavailable_refund') != 'error.ai_unavailable_refund'
+              ? AppLocalizations.of(context).t('error.ai_unavailable_refund')
+              : 'Ag sorunu: coin iade edildi. Lutfen bir sure sonra tekrar deneyin.';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        }
+        return;
+      }
       final hc = context.read<HistoryController>();
       final entry = HistoryEntry(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -139,11 +173,19 @@ extension on _DreamPageState {
       if (!context.mounted) return;
       context.push('/reading/result/dream', extra: entry);
     } catch (_) {
+      // Refund coins if they were consumed, then inform user and do not navigate
+      try {
+        final entNow = context.read<EntitlementsController>();
+        if (entNow.lastUnlockMethod == 'coins') {
+          await entNow.addCoins(SkuCosts.dream);
+        }
+      } catch (_) {}
       if (!context.mounted) return;
-      context.push('/reading/result/dream', extra: {
-        'text': ctrl.text,
-        'style': _style,
-      });
+      final msg = AppLocalizations.of(context).t('error.ai_unavailable_refund') != 'error.ai_unavailable_refund'
+          ? AppLocalizations.of(context).t('error.ai_unavailable_refund')
+          : 'Ag sorunu: coin iade edildi. Lutfen bir sure sonra tekrar deneyin.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      return;
     }
   }
 }
