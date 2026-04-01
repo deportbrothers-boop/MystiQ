@@ -372,6 +372,24 @@ app.post('/stream', async (req, res) => {
   }
 });
 
+app.get('/models', async (req, res) => {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+    );
+    const data = await response.json();
+    const flashModels = data.models
+      ?.filter(m => m.name.includes('flash'))
+      .map(m => m.name);
+    res.json({ flashModels });
+  } catch (e) {
+    const status = e?.status || e?.response?.status || 500;
+    try { console.error('[models]', status, e?.message, e?.response?.data || ''); } catch (_) {}
+    res.status(status).json({ error: e?.message || 'models_error', status, details: e?.response?.data });
+  }
+});
+
 const PORT = process.env.PORT || 8787;
 app.listen(PORT, () => console.log(`[mystiq-ai] server listening on ${PORT}`));
 
