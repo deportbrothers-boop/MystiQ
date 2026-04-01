@@ -42,7 +42,7 @@ app.use((req, res, next) => {
   return res.status(401).json({ error: 'unauthorized' });
 });
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-1.5-flash';
 
 /*
 // Lazy OpenAI client kept commented for future provider work.
