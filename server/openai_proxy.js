@@ -14,21 +14,30 @@ const app = express();
 // Restrictive CORS: allow configured origins; native apps often have no Origin header
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
-  .map(s => s.trim())
+  .map((s) => s.trim())
   .filter(Boolean);
+
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
     if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return cb(null, true);
     return cb(new Error('CORS not allowed'), false);
   },
-  methods: ['GET','POST','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   maxAge: 600,
 }));
+
 app.use(morgan('tiny'));
-const limiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 app.use(limiter);
+
 // Gemini inline image prompting needs more headroom than the old text-only proxy.
 app.use(express.json({ limit: '20mb' }));
 
@@ -37,7 +46,7 @@ const APP_TOKEN = process.env.APP_TOKEN || '';
 app.use((req, res, next) => {
   if (!APP_TOKEN) return next();
   if (req.path === '/health') return next();
-  const auth = req.headers['authorization'] || '';
+  const auth = req.headers.authorization || '';
   if (auth === `Bearer ${APP_TOKEN}`) return next();
   return res.status(401).json({ error: 'unauthorized' });
 });
@@ -56,107 +65,276 @@ function getClient() {
 }
 */
 
+function pickFirstString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
+function normalizeTopic(topic) {
+  const value = (topic || '').toString().trim();
+  const normalized = value.toLocaleLowerCase('tr-TR');
+  const map = new Map([
+    ['genel', 'Genel'],
+    ['aşk', 'Aşk'],
+    ['ask', 'Aşk'],
+    ['iş', 'İş'],
+    ['is', 'İş'],
+    ['para', 'Para'],
+    ['sağlık', 'Sağlık'],
+    ['saglik', 'Sağlık'],
+  ]);
+  return map.get(normalized) || 'Genel';
+}
+
+function normalizeCards(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item == null ? '' : String(item).trim()))
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    return value
+      .replace(/^Tarot cards:\s*/i, '')
+      .replace(/^Kartlar:\s*/i, '')
+      .split(/[\n,|]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+
+  return [];
+}
+
+function formatTarotCards(cards) {
+  const labels = ['Geçmiş', 'Şimdi', 'Yansıma'];
+  if (!cards.length) {
+    return [
+      '- Geçmiş: Belirtilmedi',
+      '- Şimdi: Belirtilmedi',
+      '- Yansıma: Belirtilmedi',
+      'Kart isimleri paylaşılmadıysa kart adı uydurma; yalnızca pozisyon enerjilerini yorumla.',
+    ].join('\n');
+  }
+
+  return labels
+    .map((label, index) => `- ${label}: ${cards[index] || 'Belirtilmedi'}`)
+    .join('\n');
+}
+
+function resolveProfile(profile, body) {
+  return {
+    ...(profile || {}),
+    name: pickFirstString(body?.userName, body?.name, profile?.name),
+    zodiac: pickFirstString(body?.zodiac, body?.sign, profile?.zodiac),
+  };
+}
+
+function resolveInputs(inputs, body) {
+  const inputCards = normalizeCards(inputs?.cards);
+  const bodyCards = normalizeCards(body?.cards);
+  const inputImages = Array.isArray(inputs?.imageBase64s) ? inputs.imageBase64s : [];
+  const bodyImages = Array.isArray(body?.imageBase64s) ? body.imageBase64s : [];
+
+  return {
+    ...(inputs || {}),
+    topic: pickFirstString(inputs?.topic, body?.topic),
+    style: pickFirstString(inputs?.style, body?.style),
+    styleHintTr: pickFirstString(inputs?.styleHintTr, body?.styleHintTr),
+    text: pickFirstString(inputs?.text, body?.userMessage, body?.text, body?.message),
+    cards: inputCards.length ? inputCards : bodyCards,
+    imageBase64: pickFirstString(inputs?.imageBase64, body?.imageBase64),
+    imageBase64s: [...inputImages, ...bodyImages].filter((item) => typeof item === 'string' && item.trim()),
+    prevIntroSig: pickFirstString(inputs?.prevIntroSig, body?.prevIntroSig),
+    zodiac: pickFirstString(inputs?.zodiac, body?.zodiac, body?.sign),
+  };
+}
+
 function buildPrompt({ type, profile, inputs, locale }) {
-  const lang = (locale || 'tr').toLowerCase();
-  const langName = lang.startsWith('tr') ? 'Turkish'
-    : lang.startsWith('es') ? 'Spanish'
-    : lang.startsWith('ar') ? 'Arabic'
-    : 'English';
+  const name = pickFirstString(profile?.name, inputs?.userName) || 'danışan';
+  const zodiac = pickFirstString(profile?.zodiac, inputs?.zodiac) || 'Belirtilmedi';
+  const topic = normalizeTopic(inputs?.topic);
+  const text = pickFirstString(inputs?.text);
+  const style = pickFirstString(inputs?.style);
+  const styleHintTr = pickFirstString(inputs?.styleHintTr);
+  const cards = normalizeCards(inputs?.cards);
+  const dow = new Date().toLocaleDateString(locale || 'tr-TR', { weekday: 'long' });
 
-  const name = (profile?.name || '').toString().trim();
-  const zodiac = (profile?.zodiac || '').toString().trim();
-  const topic = (inputs?.topic || '').toString().trim();
-  const style = (inputs?.style || '').toString().trim();
-  const text = (inputs?.text || '').toString();
-  const cards = Array.isArray(inputs?.cards) ? inputs.cards.join(', ') : '';
-  const dow = new Date().toLocaleDateString(locale || 'tr', { weekday: 'long' });
+  const extraNotes = [
+    style ? `Kullanıcının talep ettiği ton: ${style}` : '',
+    styleHintTr ? `Ek stil notu: ${styleHintTr}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
-  const coffeePolicyTr =
-    'MYSTIQ – Kahve Yorumu ÇIKTI KURALLARI (GÜNCEL)\n' +
-    'ZORUNLU KURALLAR\n' +
-    '1) Kullanıcı adı mutlaka geçmeli:\n' +
-    '- İlk paragrafta 1 kez: “{userName}, …”\n' +
-    '- Metin boyunca toplam 1–2 kez geçsin.\n' +
-    '2) Metin uzun olmalı:\n' +
-    '- 900–1500 karakter (yaklaşık 140–230 kelime).\n' +
-    '- 4–5 kısa paragraf halinde akıcı anlatım.\n' +
-    '3) Ton:\n' +
-    '- Sıcak, samimi, sezgisel.\n' +
-    '- Kesin hüküm yok; “olacak/kesin/garanti/mutlaka” yok.\n' +
-    '- Gelecek tahmini / kehanet yok. Yönlendirme ve içgörü dili.\n' +
-    '4) İçerik yapısı (bu sırayla):\n' +
-    'A) Açılış: isim + fincanın genel havası + gün/ritim\n' +
-    'B) Detaylı gözlem: 2–3 iz/şekil + yorum\n' +
-    'C) Günün teması\n' +
-    'D) Mini öneriler: 2 öneri (1 sosyal, 1 içsel) — 2 satır\n' +
-    'E) Kapanış + geri çağırma CTA\n' +
-    '5) Kapanış CTA (ZORUNLU): “kahve yorumunun/fincanın sonuna geliyorken” hissi + tekrar çağır.\n' +
-    'FORMAT\n' +
-    'Başlık: “Kahve Yorumu”\n' +
-    'Alt bölüm:\n' +
-    '“Bugünün Mini Önerileri:”\n' +
-    '- ...\n' +
-    '- ...\n' +
-    'En alt: “Bu içerik eğlence amaçlıdır; kesinlik içermez.”\n';
-
-  // System prompt: allow heading/sections only for coffee; otherwise keep minimal.
-  let sys = (type === 'coffee')
-    ? `Sen MystiQ için kahve sembolü yorumlayıcısısın. ${coffeePolicyTr}`
-    : `You are MystiQ's ${type || 'reading'} assistant. Produce only the reading text in ${langName}. Do not add headings, disclaimers, or meta comments.`;
-  const styleHintTr = (inputs?.styleHintTr || '').toString().trim();
-  if (type === 'coffee') {
-    sys += ' Gelecek hakkında tahmin yapma. Tarih verme. Kesinlik iddiasında bulunma. “Olacak” yerine “gibi/hissi/çağrıştırıyor” kullan.';
-  }
-  if (styleHintTr) sys += ` ${styleHintTr}`;
-
-  // Provide raw context by type without stylistic shaping.
-  let user;
   switch (type) {
-    case 'coffee':
-      user = lang.startsWith('tr')
-        ? `Kahve yorumu. Gün: ${dow}. ${topic ? `Konu: ${topic}. ` : ''}${style ? `Stil: ${style}. ` : ''}${name ? `Kullanıcı adı: ${name}. ` : ''}${inputs?.prevIntroSig ? `Önceki giriş kalıbı: ${inputs.prevIntroSig}. ` : ''}Kurallara birebir uy.`
-        : `Coffee reading. Day: ${dow}. ${topic ? `Topic: ${topic}. ` : ''}${style ? `Style: ${style}. ` : ''}${name ? `User name: ${name}. ` : ''}`;
-      break;
-    case 'tarot':
-      user = lang.startsWith('tr')
-        ? `Tarot yorumu. Kartlar: ${cards}. ${topic ? `Konu: ${topic}. ` : ''}${style ? `Stil: ${style}. ` : ''}${name ? `Isim: ${name}.` : ''}`
-        : `Tarot reading. Cards: ${cards}. ${topic ? `Topic: ${topic}. ` : ''}${style ? `Style: ${style}. ` : ''}${name ? `Name: ${name}.` : ''}`;
-      break;
-    case 'palm':
-      user = lang.startsWith('tr')
-        ? `El cizgisi yorumu. Gun: ${dow}. ${style ? `Stil: ${style}. ` : ''}${name ? `Isim: ${name}.` : ''}`
-        : `Palm reading. Day: ${dow}. ${style ? `Style: ${style}. ` : ''}${name ? `Name: ${name}.` : ''}`;
-      break;
-    case 'dream':
-      user = lang.startsWith('tr')
-        ? `Asagidaki ruya icin yorum yaz. Sadece yorum metnini dondur. Ruya metni:\n${text}`
-        : `Write an interpretation for the following dream. Return only the interpretation text. Dream text:\n${text}`;
-      break;
-    case 'live_chat': {
-      const h = Array.isArray(inputs?.history) ? inputs.history : [];
-      const turn = (m) => `${m.role === 'assistant' ? (lang.startsWith('tr')? 'Asistan' : 'Assistant') : (lang.startsWith('tr')? 'Kullanici' : 'User')}: ${m.text}`;
-      const transcript = h.map(turn).join('\n');
-      const q = (inputs?.text || '').toString();
-      user = lang.startsWith('tr')
-        ? `Sohbet. Sadece cevap metnini dondur; baslik veya aciklama ekleme.\n\nGecmis:\n${transcript}\n\nSoru:\n${q}`
-        : `Chat. Return only the reply text; do not add headings or meta.\n\nHistory:\n${transcript}\n\nUser:\n${q}`;
-      break;
-    }
-    case 'astro':
-      user = lang.startsWith('tr')
-        ? `Gunluk astroloji. Burc: ${zodiac}. Gun: ${dow}.`
-        : `Daily astrology. Sign: ${zodiac}. Day: ${dow}.`;
-      break;
-    case 'motivation':
-      user = lang.startsWith('tr')
-        ? `Gunluk motivasyon yaz. Gun: ${dow}. Sadece motivasyon metnini dondur.`
-        : `Write a daily motivation message. Day: ${dow}. Return only the motivation text.`;
-      break;
-    default:
-      user = lang.startsWith('tr') ? 'Yorum yaz.' : 'Write a reading.';
-  }
+    case 'coffee': {
+      const sys = `Sen MystiQ'nun efsanevi kahve falı yorumcusun, adın Azra.
+İstanbul'da onlarca yıl kahve falı baktın. Kullanıcıya mutlaka ismiyle hitap et.
 
-  return { sys, user };
+ÖNEMLİ KURAL: Eğer fincanda şekil, iz veya sembol göremiyorsan bunu nazikçe belirt: "Sevgili ${name}, fincanın şu an yoruma hazır görünmüyor. Kahvenizi tamamen içip fincanı ters çevirdikten sonra en az 10 dakika beklemenizi öneririm. Ardından tekrar fotoğraf çekerek falınıza bakabilirsiniz." diyerek bitir, başka yorum yapma.
+
+Eğer şekiller görünüyorsa:
+- Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
+- Fincan içindeki şekilleri tek tek tanımla ve yorumla
+- Tabaktaki şekilleri yorumla
+- ${topic} konusuna odaklanarak yorumu derinleştir
+- Kullanıcının hayatına dair somut, kişisel mesajlar ver
+- Sonu gizemli ve merak uyandırıcı bitir
+- Türkçe, samimi, sıcak ve mistik bir dille yaz
+- Minimum 300, maksimum 400 kelime`;
+
+      const user = [
+        'Kahve falı bağlamı:',
+        `Kullanıcı adı: ${name}`,
+        `Konu: ${topic}`,
+        `Gün: ${dow}`,
+        `Kullanıcının notu: ${text || 'Belirtilmedi.'}`,
+        'Gönderilen görseller fincanın içi ve varsa tabak görüntüleridir. Önce fincanda okunabilir şekiller olup olmadığını kontrol et.',
+        extraNotes,
+      ].filter(Boolean).join('\n');
+
+      return { sys, user };
+    }
+
+    case 'tarot': {
+      const sys = `Sen MystiQ'nun mistik tarot yorumlayıcısısın, adın Azra.
+Kullanıcıya mutlaka ismiyle hitap et.
+Seçilen 3 kart: Geçmiş, Şimdi, Yansıma pozisyonlarında.
+Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
+
+- Her kartı ismiyle tanıt ve sembolik anlamını açıkla
+- Kartların ${topic} konusu için ne anlattığını yorumla
+- Geçmişten bugüne, bugünden geleceğe bir hikaye ör
+- Kullanıcıya somut bir mesaj ve öneri ver
+- Sonu umut verici ama gizemli bitir
+- Türkçe, derin ve etkileyici yaz
+- Minimum 300, maksimum 400 kelime`;
+
+      const user = [
+        'Tarot bağlamı:',
+        `Kullanıcı adı: ${name}`,
+        `Konu: ${topic}`,
+        `Kullanıcının sorusu: ${text || 'Belirtilmedi.'}`,
+        'Kartlar:',
+        formatTarotCards(cards),
+        extraNotes,
+      ].filter(Boolean).join('\n');
+
+      return { sys, user };
+    }
+
+    case 'palm': {
+      const sys = `Sen MystiQ'nun deneyimli el falı yorumcusun, adın Azra.
+Kullanıcıya mutlaka ismiyle hitap et.
+Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
+
+ÖNEMLİ KURAL: Eğer elde çizgiler net görünmüyorsa:
+"Sevgili ${name}, el fotoğrafın yeterince net değil. Lütfen elinizi düz bir zemine koyup, iyi aydınlatılmış bir ortamda yakından tekrar fotoğraf çekin."
+diyerek bitir.
+
+Eğer çizgiler görünüyorsa:
+- Kalp çizgisi, kader çizgisi, akıl çizgisi, yaşam çizgisini tek tek yorumla
+- ${topic} konusuna odaklanarak derinleştir
+- Elde gördüğün özel işaretleri belirt
+- Somut ve kişisel mesajlar ver
+- Türkçe, mistik ve samimi yaz
+- Minimum 300, maksimum 400 kelime`;
+
+      const user = [
+        'El falı bağlamı:',
+        `Kullanıcı adı: ${name}`,
+        `Konu: ${topic}`,
+        `Gün: ${dow}`,
+        `Kullanıcının notu: ${text || 'Belirtilmedi.'}`,
+        'Gönderilen görsel el fotoğrafıdır. Önce çizgilerin net görünüp görünmediğini kontrol et.',
+        extraNotes,
+      ].filter(Boolean).join('\n');
+
+      return { sys, user };
+    }
+
+    case 'astro': {
+      const sys = `Sen MystiQ'nun astroloji uzmanısın, adın Azra.
+Kullanıcıya mutlaka ismiyle ve burcuyla hitap et.
+Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
+
+- Kullanıcının burcunu ve bu dönemdeki gezegen etkilerini açıkla
+- ${topic} konusunda bu haftaki/aydaki enerjileri yorumla
+- Burca özel güçlü ve zayıf yanları belirt
+- Somut öneriler ve dikkat edilmesi gerekenler yaz
+- Şanslı gün, renk veya sayı ekle
+- Türkçe, bilgili ve mistik yaz
+- Minimum 300, maksimum 400 kelime`;
+
+      const user = [
+        'Astroloji bağlamı:',
+        `Kullanıcı adı: ${name}`,
+        `Kullanıcı burcu: ${zodiac}`,
+        `Konu: ${topic}`,
+        `Gün: ${dow}`,
+        `Kullanıcının notu: ${text || 'Belirtilmedi.'}`,
+        extraNotes,
+      ].filter(Boolean).join('\n');
+
+      return { sys, user };
+    }
+
+    case 'dream': {
+      const sys = `Sen MystiQ'nun rüya yorumcusun, adın Azra.
+Kullanıcıya mutlaka ismiyle hitap et.
+
+- Rüyadaki sembolleri tek tek yorumla
+- Rüyanın genel mesajını açıkla
+- Bilinçaltının ne anlatmaya çalıştığını yaz
+- Kullanıcıya bu rüyadan çıkarması gereken mesajı ver
+- Sonu olumlu ve yönlendirici bitir
+- Türkçe, derin ve içten yaz
+- Minimum 300, maksimum 400 kelime`;
+
+      const user = [
+        'Rüya bağlamı:',
+        `Kullanıcı adı: ${name}`,
+        'Rüya metni:',
+        text || 'Belirtilmedi.',
+        extraNotes,
+      ].filter(Boolean).join('\n');
+
+      return { sys, user };
+    }
+
+    case 'live_chat': {
+      const history = Array.isArray(inputs?.history) ? inputs.history : [];
+      const transcript = history
+        .map((item) => `${item.role === 'assistant' ? 'Asistan' : 'Kullanıcı'}: ${item.text}`)
+        .join('\n');
+      const user = [
+        'Sohbet modu.',
+        'Sadece cevap metnini döndür; başlık, madde listesi veya meta açıklama ekleme.',
+        transcript ? `Geçmiş:\n${transcript}` : '',
+        `Son mesaj: ${text || 'Belirtilmedi.'}`,
+      ].filter(Boolean).join('\n\n');
+      return {
+        sys: 'Sen MystiQ asistanısın. Türkçe, kısa ve doğal cevap ver.',
+        user,
+      };
+    }
+
+    case 'motivation':
+      return {
+        sys: 'Sen MystiQ için kısa günlük motivasyon mesajları yazan bir asistansın. Sadece motivasyon metnini üret.',
+        user: `Kullanıcı adı: ${name}\nGün: ${dow}\nNot: ${text || 'Belirtilmedi.'}`,
+      };
+
+    default:
+      return {
+        sys: 'Sen MystiQ için Türkçe yorum üreten bir asistansın. Sadece yorum metnini döndür.',
+        user: `Kullanıcı adı: ${name}\nNot: ${text || 'Belirtilmedi.'}`,
+      };
+  }
 }
 
 function getGeminiApiKey() {
@@ -172,28 +350,48 @@ function guessMimeType(base64) {
   return 'image/jpeg';
 }
 
+function normalizeImagePart(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const trimmed = value.trim();
+  const dataUrlMatch = trimmed.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (dataUrlMatch) {
+    return {
+      mimeType: dataUrlMatch[1],
+      data: dataUrlMatch[2],
+    };
+  }
+  return {
+    mimeType: guessMimeType(trimmed),
+    data: trimmed,
+  };
+}
+
 function buildGeminiParts({ user, inputs }) {
   const parts = [{ text: user }];
   const rawImages = [];
   const imageList = Array.isArray(inputs?.imageBase64s) ? inputs.imageBase64s : [];
+
   for (const item of imageList) {
     if (typeof item === 'string' && item.trim()) rawImages.push(item.trim());
   }
+
   if (typeof inputs?.imageBase64 === 'string' && inputs.imageBase64.trim()) {
     rawImages.push(inputs.imageBase64.trim());
   }
 
   const seen = new Set();
-  for (const b64 of rawImages) {
-    if (seen.has(b64)) continue;
-    seen.add(b64);
+  for (const rawImage of rawImages) {
+    const imagePart = normalizeImagePart(rawImage);
+    if (!imagePart || seen.has(imagePart.data)) continue;
+    seen.add(imagePart.data);
     parts.push({
       inlineData: {
-        mimeType: guessMimeType(b64),
-        data: b64,
+        mimeType: imagePart.mimeType,
+        data: imagePart.data,
       },
     });
   }
+
   return parts;
 }
 
@@ -223,7 +421,15 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
     throw err;
   }
 
-  const { sys, user } = buildPrompt({ type, profile, inputs, locale });
+  const mergedProfile = resolveProfile(profile, body);
+  const mergedInputs = resolveInputs(inputs, body);
+  const { sys, user } = buildPrompt({
+    type,
+    profile: mergedProfile,
+    inputs: mergedInputs,
+    locale,
+  });
+
   const temp = (typeof body?.temperature === 'number')
     ? body.temperature
     : ((type === 'dream') ? 0.3 : 0.85);
@@ -235,11 +441,12 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
     contents: [
       {
         role: 'user',
-        parts: buildGeminiParts({ user, inputs }),
+        parts: buildGeminiParts({ user, inputs: mergedInputs }),
       },
     ],
     generationConfig: {
       temperature: temp,
+      maxOutputTokens: 800,
     },
   };
 
@@ -313,7 +520,6 @@ app.post('/generate', async (req, res) => {
     res.json({ text: r.text });
   } catch (e) {
     const status = e?.status || e?.response?.status || 500;
-    // Log full error server-side for diagnosis
     try { console.error('[generate]', status, e?.message, e?.response?.data || ''); } catch (_) {}
     res.status(status).json({ error: e?.message || 'server_error', status, details: e?.response?.data });
   }
@@ -324,6 +530,7 @@ app.post('/stream', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   const send = (data) => res.write(`data: ${data}\n\n`);
+
   try {
     const { type, profile, inputs, locale } = req.body || {};
     const r = await generateWithGemini({
