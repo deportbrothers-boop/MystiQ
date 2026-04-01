@@ -227,12 +227,6 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
   const temp = (typeof body?.temperature === 'number')
     ? body.temperature
     : ((type === 'dream') ? 0.3 : 0.85);
-  const presence = (typeof body?.presence_penalty === 'number')
-    ? body.presence_penalty
-    : (type === 'coffee' ? 0.9 : 0.6);
-  const frequency = (typeof body?.frequency_penalty === 'number')
-    ? body.frequency_penalty
-    : (type === 'coffee' ? 0.4 : 0.2);
 
   const payload = {
     systemInstruction: {
@@ -246,8 +240,6 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
     ],
     generationConfig: {
       temperature: temp,
-      presencePenalty: presence,
-      frequencyPenalty: frequency,
     },
   };
 
