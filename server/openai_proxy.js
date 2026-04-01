@@ -1,14 +1,14 @@
-// Simple OpenAI proxy for MystiQ
+// Simple AI proxy for MystiQ
 import 'dotenv/config';
 // - Exposes POST /generate (JSON) and POST /stream (SSE-like)
-// - Reads API key from env: OPENAI_API_KEY
+// - Reads Gemini API key from env: GEMINI_API_KEY
 // - Never expose your API key in the mobile app; run this server on your machine
 
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import OpenAI from 'openai';
+// import OpenAI from 'openai';
 
 const app = express();
 // Restrictive CORS: allow configured origins; native apps often have no Origin header
@@ -29,7 +29,8 @@ app.use(cors({
 app.use(morgan('tiny'));
 const limiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
 app.use(limiter);
-app.use(express.json({ limit: '1mb' }));
+// Gemini inline image prompting needs more headroom than the old text-only proxy.
+app.use(express.json({ limit: '20mb' }));
 
 // Optional bearer guard
 const APP_TOKEN = process.env.APP_TOKEN || '';
@@ -41,7 +42,10 @@ app.use((req, res, next) => {
   return res.status(401).json({ error: 'unauthorized' });
 });
 
-// Lazy OpenAI client
+const GEMINI_MODEL = 'gemini-2.0-flash';
+
+/*
+// Lazy OpenAI client kept commented for future provider work.
 let _client = null;
 function getClient() {
   if (_client) return _client;
@@ -50,6 +54,7 @@ function getClient() {
   _client = new OpenAI({ apiKey: key });
   return _client;
 }
+*/
 
 function buildPrompt({ type, profile, inputs, locale }) {
   const lang = (locale || 'tr').toLowerCase();
@@ -154,21 +159,152 @@ function buildPrompt({ type, profile, inputs, locale }) {
   return { sys, user };
 }
 
+function getGeminiApiKey() {
+  return (process.env.GEMINI_API_KEY || '').trim();
+}
+
+function guessMimeType(base64) {
+  if (typeof base64 !== 'string' || !base64) return 'image/jpeg';
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('iVBORw0KGgo')) return 'image/png';
+  if (base64.startsWith('R0lGOD')) return 'image/gif';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  return 'image/jpeg';
+}
+
+function buildGeminiParts({ user, inputs }) {
+  const parts = [{ text: user }];
+  const rawImages = [];
+  const imageList = Array.isArray(inputs?.imageBase64s) ? inputs.imageBase64s : [];
+  for (const item of imageList) {
+    if (typeof item === 'string' && item.trim()) rawImages.push(item.trim());
+  }
+  if (typeof inputs?.imageBase64 === 'string' && inputs.imageBase64.trim()) {
+    rawImages.push(inputs.imageBase64.trim());
+  }
+
+  const seen = new Set();
+  for (const b64 of rawImages) {
+    if (seen.has(b64)) continue;
+    seen.add(b64);
+    parts.push({
+      inlineData: {
+        mimeType: guessMimeType(b64),
+        data: b64,
+      },
+    });
+  }
+  return parts;
+}
+
+function geminiUsageToOpenAI(usageMetadata) {
+  if (!usageMetadata) return null;
+  return {
+    prompt_tokens: usageMetadata.promptTokenCount ?? null,
+    completion_tokens: usageMetadata.candidatesTokenCount ?? null,
+    total_tokens: usageMetadata.totalTokenCount ?? null,
+  };
+}
+
+function extractGeminiText(data) {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return '';
+  return parts
+    .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+    .join('')
+    .trim();
+}
+
+async function generateWithGemini({ type, profile, inputs, locale, body }) {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    const err = new Error('missing_gemini_api_key');
+    err.status = 503;
+    throw err;
+  }
+
+  const { sys, user } = buildPrompt({ type, profile, inputs, locale });
+  const temp = (typeof body?.temperature === 'number')
+    ? body.temperature
+    : ((type === 'dream') ? 0.3 : 0.85);
+  const presence = (typeof body?.presence_penalty === 'number')
+    ? body.presence_penalty
+    : (type === 'coffee' ? 0.9 : 0.6);
+  const frequency = (typeof body?.frequency_penalty === 'number')
+    ? body.frequency_penalty
+    : (type === 'coffee' ? 0.4 : 0.2);
+
+  const payload = {
+    systemInstruction: {
+      parts: [{ text: sys }],
+    },
+    contents: [
+      {
+        role: 'user',
+        parts: buildGeminiParts({ user, inputs }),
+      },
+    ],
+    generationConfig: {
+      temperature: temp,
+      presencePenalty: presence,
+      frequencyPenalty: frequency,
+    },
+  };
+
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const raw = await resp.text();
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    data = { raw };
+  }
+
+  if (!resp.ok) {
+    const err = new Error(data?.error?.message || raw || 'gemini_error');
+    err.status = resp.status;
+    err.response = { data };
+    throw err;
+  }
+
+  const text = extractGeminiText(data);
+  if (!text) {
+    const err = new Error(data?.promptFeedback?.blockReason || 'empty_gemini_response');
+    err.status = 502;
+    err.response = { data };
+    throw err;
+  }
+
+  const usage = geminiUsageToOpenAI(data?.usageMetadata);
+  return { text, usage, raw: data };
+}
+
 app.post('/generate', async (req, res) => {
   try {
+    const { type, profile, inputs, locale } = req.body || {};
+    const r = await generateWithGemini({
+      type,
+      profile,
+      inputs,
+      locale,
+      body: req.body || {},
+    });
+    console.log('USAGE:', JSON.stringify(r.usage));
+
+    /*
+    // OpenAI request kept commented for future provider work.
     const client = getClient();
-    if (!client) return res.status(503).json({ error: 'missing_api_key' });
-    const { type, profile, inputs, locale, model } = req.body || {};
-    const { sys, user } = buildPrompt({ type, profile, inputs, locale });
-    const temp = (typeof req.body?.temperature === 'number')
-      ? req.body.temperature
-      : ((type === 'dream') ? 0.3 : 0.85);
-    const presence = (typeof req.body?.presence_penalty === 'number')
-      ? req.body.presence_penalty
-      : (type === 'coffee' ? 0.9 : 0.6);
-    const frequency = (typeof req.body?.frequency_penalty === 'number')
-      ? req.body.frequency_penalty
-      : (type === 'coffee' ? 0.4 : 0.2);
     const r = await client.chat.completions.create({
       model: model || 'gpt-4o-mini',
       temperature: temp,
@@ -179,8 +315,10 @@ app.post('/generate', async (req, res) => {
         { role: 'user', content: user }
       ],
     });
-    const text = r.choices?.[0]?.message?.content?.trim() || '';
-    res.json({ text });
+    console.log('USAGE:', JSON.stringify(r.usage));
+    */
+
+    res.json({ text: r.text });
   } catch (e) {
     const status = e?.status || e?.response?.status || 500;
     // Log full error server-side for diagnosis
@@ -195,22 +333,18 @@ app.post('/stream', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   const send = (data) => res.write(`data: ${data}\n\n`);
   try {
-    const client = getClient();
-    if (!client) {
-      send(JSON.stringify({ error: 'missing_api_key' }));
-      return res.end();
-    }
-    const { type, profile, inputs, locale, model } = req.body || {};
-    const { sys, user } = buildPrompt({ type, profile, inputs, locale });
-    const temp = (typeof req.body?.temperature === 'number')
-      ? req.body.temperature
-      : ((type === 'dream') ? 0.3 : 0.85);
-    const presence = (typeof req.body?.presence_penalty === 'number')
-      ? req.body.presence_penalty
-      : (type === 'coffee' ? 0.9 : 0.6);
-    const frequency = (typeof req.body?.frequency_penalty === 'number')
-      ? req.body.frequency_penalty
-      : (type === 'coffee' ? 0.4 : 0.2);
+    const { type, profile, inputs, locale } = req.body || {};
+    const r = await generateWithGemini({
+      type,
+      profile,
+      inputs,
+      locale,
+      body: req.body || {},
+    });
+    console.log('USAGE:', JSON.stringify(r.usage));
+
+    /*
+    // OpenAI streaming kept commented for future provider work.
     const stream = await client.chat.completions.create({
       model: model || 'gpt-4o-mini',
       temperature: temp,
@@ -222,8 +356,10 @@ app.post('/stream', async (req, res) => {
         { role: 'user', content: user }
       ],
     });
-    for await (const part of stream) {
-      const delta = part.choices?.[0]?.delta?.content || '';
+    */
+
+    const chunks = r.text.match(/\S+\s*/g) || (r.text ? [r.text] : []);
+    for (const delta of chunks) {
       if (delta) send(JSON.stringify({ delta }));
     }
     send('[DONE]');
@@ -240,6 +376,6 @@ const PORT = process.env.PORT || 8787;
 app.listen(PORT, () => console.log(`[mystiq-ai] server listening on ${PORT}`));
 
 app.get('/health', (req, res) => {
-  const hasKey = Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim());
-  res.json({ ok: true, model: (process.env.OPENAI_MODEL || 'gpt-4o-mini'), hasApiKey: hasKey });
+  const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim());
+  res.json({ ok: true, provider: 'gemini', model: GEMINI_MODEL, hasApiKey: hasKey });
 });
