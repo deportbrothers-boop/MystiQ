@@ -37,6 +37,7 @@ const APP_TOKEN = process.env.APP_TOKEN || '';
 app.use((req, res, next) => {
   if (!APP_TOKEN) return next();
   if (req.path === '/health') return next();
+  if (req.path === '/models') return next();
   const auth = req.headers['authorization'] || '';
   if (auth === `Bearer ${APP_TOKEN}`) return next();
   return res.status(401).json({ error: 'unauthorized' });
