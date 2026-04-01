@@ -37,13 +37,12 @@ const APP_TOKEN = process.env.APP_TOKEN || '';
 app.use((req, res, next) => {
   if (!APP_TOKEN) return next();
   if (req.path === '/health') return next();
-  if (req.path === '/models') return next();
   const auth = req.headers['authorization'] || '';
   if (auth === `Bearer ${APP_TOKEN}`) return next();
   return res.status(401).json({ error: 'unauthorized' });
 });
 
-const GEMINI_MODEL = 'gemini-1.5-flash-latest';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 /*
 // Lazy OpenAI client kept commented for future provider work.
@@ -370,24 +369,6 @@ app.post('/stream', async (req, res) => {
     try { console.error('[stream]', status, e?.message, e?.response?.data || ''); } catch (_) {}
     send(JSON.stringify({ error: e?.message || 'stream_error', status, details: e?.response?.data }));
     res.end();
-  }
-});
-
-app.get('/models', async (req, res) => {
-  try {
-    const apiKey = process.env.GEMINI_API_KEY;
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
-    );
-    const data = await response.json();
-    const flashModels = data.models
-      ?.filter(m => m.name.includes('flash'))
-      .map(m => m.name);
-    res.json({ flashModels });
-  } catch (e) {
-    const status = e?.status || e?.response?.status || 500;
-    try { console.error('[models]', status, e?.message, e?.response?.data || ''); } catch (_) {}
-    res.status(status).json({ error: e?.message || 'models_error', status, details: e?.response?.data });
   }
 });
 
