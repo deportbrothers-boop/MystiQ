@@ -15,6 +15,7 @@ import '../../profile/user_profile.dart';
 import '../../../core/ai/ai_service.dart';
 import '../../../core/ai/local_generator.dart';
 import '../../../core/readings/pending_readings_service_fixed.dart';
+import '../../../core/readings/reading_timing.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../tarot/tarot_deck_fixed.dart';
@@ -54,8 +55,9 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
   bool _isAiFailure(String s) =>
       s.trim().startsWith('Uretim su anda yapilamiyor');
 
-  static const Duration _coffeeInitialEta = Duration(minutes: 10);
-  static const Duration _speedupTargetEta = Duration(minutes: 5);
+  Duration get _speedupTargetEta => ReadingTiming.speedupTargetFor(widget.type);
+  String get _speedupTargetLabel =>
+      ReadingTiming.speedupTargetLabel(widget.type);
 
   bool _shouldBackToHome() {
     // Kahve yorumunun geri sayım ekranında geri tuşu ana menüye dönsün.
@@ -197,11 +199,13 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     } catch (_) {}
   }
 
-  Future<void> _speedUpToFiveMinutes() async {
+  Future<void> _speedUpToTarget() async {
     final id = _pendingId;
     if (id == null || id.isEmpty) return;
+    final targetEta = _speedupTargetEta;
+    if (targetEta <= Duration.zero) return;
     final left = _remainingSeconds ?? 0;
-    if (left <= _speedupTargetEta.inSeconds) return;
+    if (left <= targetEta.inSeconds) return;
     if (_speedingUp || _speedupUsed) return;
 
     setState(() => _speedingUp = true);
@@ -228,7 +232,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         locale = Localizations.localeOf(context).languageCode;
       } catch (_) {}
 
-      final newReadyAt = DateTime.now().add(_speedupTargetEta);
+      final newReadyAt = DateTime.now().add(targetEta);
       try {
         await PendingReadingsService.updateReadyAt(
           id: id,
@@ -294,6 +298,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         ? context.read<ProfileController>().profile
         : ProfileController().profile;
     final extras = Map<String, dynamic>.from(widget.requestExtras ?? {});
+    final preparedText = (extras['preparedText'] ?? '').toString().trim();
     String titleSafe;
     try {
       titleSafe = titleTr(context, widget.type);
@@ -332,12 +337,14 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     }
 
     try {
-      var generated = await AiService.generate(
-        type: widget.type,
-        profile: profile,
-        extras: extras,
-        locale: locale,
-      );
+      var generated = preparedText.isNotEmpty
+          ? preparedText
+          : await AiService.generate(
+              type: widget.type,
+              profile: profile,
+              extras: extras,
+              locale: locale,
+            );
 
       if (generated.trim().isEmpty || _isAiFailure(generated)) {
         generated = _fallbackText(profile: profile, locale: locale);
@@ -443,6 +450,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     if (currentText.trim().isEmpty) return false;
     // Coffee already includes a strict outro; avoid duplicating.
     if (widget.type == 'coffee') return false;
+    if (widget.type == 'motivation') return false;
     return true;
   }
 
@@ -724,7 +732,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: _speedingUp ? null : _speedUpToFiveMinutes,
+                    onPressed: _speedingUp ? null : _speedUpToTarget,
                     icon: _speedingUp
                         ? const SizedBox(
                             width: 18,
@@ -733,6 +741,13 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
                           )
                         : const Icon(Icons.rocket_launch, size: 18),
                     label: const Text('Reklam izle • 5 dk’ya hızlandır'),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Bu fal için hedef kalan süre: $_speedupTargetLabel',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -810,6 +825,8 @@ String _title(String t) {
       return 'Rüya Tabiri';
     case 'astro':
       return 'Astroloji';
+    case 'motivation':
+      return 'Günlük Motivasyon';
     default:
       return 'MystiQ';
   }
@@ -828,6 +845,8 @@ String titleTr(BuildContext context, String t) {
       return loc.t('dream.title');
     case 'astro':
       return loc.t('astro.title');
+    case 'motivation':
+      return loc.t('motivation.title');
     default:
       return loc.t('app.name');
   }

@@ -35,9 +35,15 @@ class PendingReadingsService {
     final id = readyAt.millisecondsSinceEpoch.toString();
     final items = await _load();
     items.removeWhere((e) => e['id'] == id);
-    items.add({'id': id, 'type': type, 'readyAt': readyAt.toIso8601String(), 'extras': extras ?? {}});
+    items.add({
+      'id': id,
+      'type': type,
+      'readyAt': readyAt.toIso8601String(),
+      'extras': extras ?? {}
+    });
     await _save(items);
-    final seconds = readyAt.difference(DateTime.now()).inSeconds.clamp(1, 86400);
+    final seconds =
+        readyAt.difference(DateTime.now()).inSeconds.clamp(1, 86400);
     await PendingI18n.ensure(locale);
     await NotificationsService.scheduleOneShot(
       id: id.hashCode & 0x7FFFFFFF,
@@ -69,7 +75,8 @@ class PendingReadingsService {
   static Future<bool> isSpeedupUsed(String id) async {
     try {
       final it = await getById(id);
-      final extras = (it?['extras'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+      final extras = (it?['extras'] as Map?)?.cast<String, dynamic>() ??
+          const <String, dynamic>{};
       return extras[_kSpeedupUsed] == true;
     } catch (_) {
       return false;
@@ -81,7 +88,8 @@ class PendingReadingsService {
       final items = await _load();
       for (final it in items) {
         if ((it['id'] as String?) == id) {
-          final extras = (it['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+          final extras = (it['extras'] as Map?)?.cast<String, dynamic>() ??
+              <String, dynamic>{};
           extras[_kSpeedupUsed] = true;
           it['extras'] = extras;
           break;
@@ -105,8 +113,11 @@ class PendingReadingsService {
       }
     }
     await _save(items);
-    final seconds = readyAt.difference(DateTime.now()).inSeconds.clamp(1, 86400);
-    try { await PendingI18n.ensure(locale); } catch (_) {}
+    final seconds =
+        readyAt.difference(DateTime.now()).inSeconds.clamp(1, 86400);
+    try {
+      await PendingI18n.ensure(locale);
+    } catch (_) {}
     try {
       final notifId = id.hashCode & 0x7FFFFFFF;
       await NotificationsService.cancelOneShot(notifId);
@@ -169,7 +180,9 @@ class PendingReadingsService {
     String locale = 'tr',
   }) async {
     // Ensure localized strings are loaded before producing any titles/bodies
-    try { await PendingI18n.ensure(locale); } catch (_) {}
+    try {
+      await PendingI18n.ensure(locale);
+    } catch (_) {}
     final items = await _load();
     final now = DateTime.now();
     final remaining = <Map<String, dynamic>>[];
@@ -181,35 +194,52 @@ class PendingReadingsService {
           continue;
         }
         final type = (it['type'] as String?) ?? 'coffee';
-        final extras = (it['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+        final extras = (it['extras'] as Map?)?.cast<String, dynamic>() ??
+            <String, dynamic>{};
+        final preparedText = (extras['preparedText'] ?? '').toString().trim();
         // Legacy safety: old pending items may not have a permit saved.
-        if ((extras['permit'] ?? '').toString().trim().isEmpty) {
+        if (preparedText.isEmpty &&
+            (extras['permit'] ?? '').toString().trim().isEmpty) {
           try {
             extras['permit'] = await AiGenerationGuard.issuePermit();
           } catch (_) {}
         }
         // Always generate and save when due so result shows both on screen and in history
         String generated;
-        try {
-          AiService.configure();
-          generated = await AiService.generate(type: type, profile: profile.profile, extras: extras, locale: locale);
-        } on AiGenerationGuardException catch (e) {
-          // If the permit was already consumed, assume generation already happened elsewhere (e.g., Result page).
-          if (e.reason == 'permit_already_consumed') {
+        if (preparedText.isNotEmpty) {
+          generated = preparedText;
+        } else {
+          try {
+            AiService.configure();
+            generated = await AiService.generate(
+                type: type,
+                profile: profile.profile,
+                extras: extras,
+                locale: locale);
+          } on AiGenerationGuardException catch (e) {
+            // If the permit was already consumed, assume generation already happened elsewhere (e.g., Result page).
+            if (e.reason == 'permit_already_consumed') {
+              continue;
+            }
+            // Missing permit (shouldn't happen) -> keep pending item.
+            remaining.add(it);
             continue;
+          } catch (_) {
+            generated = '';
           }
-          // Missing permit (shouldn't happen) -> keep pending item.
-          remaining.add(it);
-          continue;
-        } catch (_) {
-          generated = '';
         }
 
-        if (generated.trim().isEmpty || generated.trim().startsWith('Uretim su anda yapilamiyor')) {
+        if (generated.trim().isEmpty ||
+            generated.trim().startsWith('Uretim su anda yapilamiyor')) {
           try {
-            generated = LocalAIGenerator.generate(type: type, profile: profile.profile, extras: extras, locale: locale);
+            generated = LocalAIGenerator.generate(
+                type: type,
+                profile: profile.profile,
+                extras: extras,
+                locale: locale);
           } catch (_) {
-            generated = 'Yorum şu an oluşturulamadı; biraz sonra tekrar deneyebilirsin.\n\nBu içerik eğlence amaçlıdır; kesinlik içermez.';
+            generated =
+                'Yorum şu an oluşturulamadı; biraz sonra tekrar deneyebilirsin.\n\nBu içerik eğlence amaçlıdır; kesinlik içermez.';
           }
         }
 
@@ -231,4 +261,3 @@ class PendingReadingsService {
     await _save(remaining);
   }
 }
-

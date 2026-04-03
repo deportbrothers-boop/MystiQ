@@ -2,15 +2,19 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/i18n/app_localizations.dart';
 import '../../../core/access/access_gate.dart';
 import '../../../core/access/sku_costs.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../core/readings/pending_readings_service_fixed.dart';
+import '../../../core/readings/reading_timing.dart';
 import '../../../common/widgets/scanning_overlay.dart';
 import '../../../core/ads/rewarded_helper.dart';
 import '../../../core/access/ai_generation_guard.dart';
+import '../../history/history_controller.dart';
+import '../../history/history_entry.dart';
 
 class PalmPage extends StatefulWidget {
   const PalmPage({super.key});
@@ -29,6 +33,30 @@ class _PalmPageState extends State<PalmPage> {
   int _starCount = 56; // background stars
   String _style = 'practical'; // 'practical' | 'spiritual' | 'analytical'
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final item = await PendingReadingsService.firstPendingOfType('palm');
+        if (!mounted || item == null) return;
+        final readyAt = DateTime.tryParse((item['readyAt'] as String?) ?? '');
+        if (readyAt == null) return;
+        final pendingId = item['id']?.toString();
+        final extras = (item['extras'] as Map?)?.cast<String, dynamic>() ??
+            <String, dynamic>{};
+        context.push('/reading/result/palm', extra: {
+          ...extras,
+          'etaSeconds':
+              readyAt.difference(DateTime.now()).inSeconds.clamp(0, 86400),
+          'readyAt': readyAt.toIso8601String(),
+          'generateAtReady': true,
+          if (pendingId != null && pendingId.isNotEmpty) 'pendingId': pendingId,
+        });
+      } catch (_) {}
+    });
+  }
+
   Future<void> _pick(ImageSource source) async {
     try {
       final x = await ImagePicker().pickImage(source: source);
@@ -36,7 +64,9 @@ class _PalmPageState extends State<PalmPage> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).t('error.permission_denied'))),
+        SnackBar(
+            content: Text(
+                AppLocalizations.of(context).t('error.permission_denied'))),
       );
     }
   }
@@ -52,7 +82,7 @@ class _PalmPageState extends State<PalmPage> {
           children: [
             ListTile(
               leading: const Icon(Icons.image),
-              title: Builder(builder: (ctx){
+              title: Builder(builder: (ctx) {
                 final t = AppLocalizations.of(ctx).t('action.from_gallery');
                 return Text(t != 'action.from_gallery' ? t : 'Galeriden');
               }),
@@ -60,7 +90,7 @@ class _PalmPageState extends State<PalmPage> {
             ),
             ListTile(
               leading: const Icon(Icons.photo_camera),
-              title: Builder(builder: (ctx){
+              title: Builder(builder: (ctx) {
                 final t = AppLocalizations.of(ctx).t('action.from_camera');
                 return Text(t != 'action.from_camera' ? t : 'Kameradan');
               }),
@@ -88,19 +118,34 @@ class _PalmPageState extends State<PalmPage> {
               '${AppLocalizations.of(context).t('palm.tuner.alpha')}: ${_goldAlpha.toStringAsFixed(2)}',
               style: const TextStyle(color: Colors.white70),
             ),
-            Slider(value: _goldAlpha, min: 0, max: 1, divisions: 100, onChanged: (v) => setState(() => _goldAlpha = v)),
+            Slider(
+                value: _goldAlpha,
+                min: 0,
+                max: 1,
+                divisions: 100,
+                onChanged: (v) => setState(() => _goldAlpha = v)),
             const SizedBox(height: 6),
             Text(
               '${AppLocalizations.of(context).t('palm.tuner.stroke')}: ${_goldStroke.toStringAsFixed(1)}',
               style: const TextStyle(color: Colors.white70),
             ),
-            Slider(value: _goldStroke, min: 1, max: 4, divisions: 30, onChanged: (v) => setState(() => _goldStroke = v)),
+            Slider(
+                value: _goldStroke,
+                min: 1,
+                max: 4,
+                divisions: 30,
+                onChanged: (v) => setState(() => _goldStroke = v)),
             const SizedBox(height: 6),
             Text(
               '${AppLocalizations.of(context).t('palm.tuner.stars')}: $_starCount',
               style: const TextStyle(color: Colors.white70),
             ),
-            Slider(value: _starCount.toDouble(), min: 24, max: 120, divisions: 24, onChanged: (v) => setState(() => _starCount = v.round())),
+            Slider(
+                value: _starCount.toDouble(),
+                min: 24,
+                max: 120,
+                divisions: 24,
+                onChanged: (v) => setState(() => _starCount = v.round())),
             Row(children: [
               TextButton(
                 onPressed: () => setState(() {
@@ -111,7 +156,9 @@ class _PalmPageState extends State<PalmPage> {
                 child: Text(AppLocalizations.of(context).t('action.reset')),
               ),
               const Spacer(),
-              TextButton(onPressed: () => Navigator.pop(context), child: Text(AppLocalizations.of(context).t('action.close'))),
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(AppLocalizations.of(context).t('action.close'))),
             ])
           ],
         ),
@@ -121,7 +168,8 @@ class _PalmPageState extends State<PalmPage> {
 
   Future<void> _startReading({bool forceAd = false}) async {
     if (image == null) return;
-    await Analytics.log('reading_started', {'type': forceAd ? 'palm_ad' : 'palm'});
+    await Analytics.log(
+        'reading_started', {'type': forceAd ? 'palm_ad' : 'palm'});
     if (!mounted) return;
 
     // Prevent starting a new reading if there is a pending one
@@ -129,26 +177,31 @@ class _PalmPageState extends State<PalmPage> {
     if (nextAt != null && nextAt.isAfter(DateTime.now())) {
       if (!mounted) return;
       final left = nextAt.difference(DateTime.now()).inMinutes + 1;
-      final msg = '${AppLocalizations.of(context).t('palm.title')} - bekleyen okuma var. Kalan: ~${left} dk';
+      final msg =
+          '${AppLocalizations.of(context).t('palm.title')} - bekleyen okuma var. Kalan: ~${left} dk';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       return;
     }
 
     final useAdFlow = forceAd;
     if (useAdFlow) {
-      final remaining = await RewardedAds.remainingTodayFor('palm', maxPerDay: 1);
+      final remaining =
+          await RewardedAds.remainingTodayFor('palm', maxPerDay: 1);
       if (remaining <= 0) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bugunluk el cizgisi yorumu reklam hakkin doldu.')),
+          const SnackBar(
+              content: Text('Bugunluk el cizgisi yorumu reklam hakkin doldu.')),
         );
         return;
       }
-      final okAd = await RewardedAds.showMultiple(context: context, count: 2, key: 'palm');
+      final okAd = await RewardedAds.showMultiple(
+          context: context, count: 2, key: 'palm');
       if (!okAd || !mounted) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Reklam gosterilemedi. Tekrar deneyin.')),
+            const SnackBar(
+                content: Text('Reklam gosterilemedi. Tekrar deneyin.')),
           );
         }
         return;
@@ -160,17 +213,13 @@ class _PalmPageState extends State<PalmPage> {
       return;
     }
 
-    final ok = await AccessGate.ensureCoinsOnlyOrPaywall(context, coinCost: SkuCosts.palmPremium);
+    final ok = await AccessGate.ensureCoinsOnlyOrPaywall(context,
+        coinCost: SkuCosts.palmPremium);
     if (!ok) return;
     if (!mounted) return;
     _adUsed = false;
     _permit = await AiGenerationGuard.issuePermit();
-    context.push('/reading/result/palm', extra: {
-      'imagePath': image!.path,
-      'style': _style,
-      if ((_permit ?? '').trim().isNotEmpty) 'permit': _permit,
-      // streaming/local flags removed
-    });
+    setState(() => scanning = true);
   }
 
   @override
@@ -184,11 +233,15 @@ class _PalmPageState extends State<PalmPage> {
       ),
       body: Stack(children: [
         // Subtle background
-        CustomPaint(painter: _PalmStarsPainter(goldAlpha: _goldAlpha, starCount: _starCount), size: Size.infinite),
+        CustomPaint(
+            painter:
+                _PalmStarsPainter(goldAlpha: _goldAlpha, starCount: _starCount),
+            size: Size.infinite),
 
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const SizedBox(height: 8),
             Expanded(
               child: GestureDetector(
@@ -197,7 +250,10 @@ class _PalmPageState extends State<PalmPage> {
                   decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: gold.withValues(alpha: (_goldAlpha.clamp(0, 1)).toDouble()), width: _goldStroke),
+                    border: Border.all(
+                        color: gold.withValues(
+                            alpha: (_goldAlpha.clamp(0, 1)).toDouble()),
+                        width: _goldStroke),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
@@ -206,9 +262,14 @@ class _PalmPageState extends State<PalmPage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.pan_tool_outlined, size: 80, color: Colors.white70),
+                                const Icon(Icons.pan_tool_outlined,
+                                    size: 80, color: Colors.white70),
                                 const SizedBox(height: 10),
-                                Text(AppLocalizations.of(context).t('palm.add_photo_hint'), style: const TextStyle(color: Colors.white54)),
+                                Text(
+                                    AppLocalizations.of(context)
+                                        .t('palm.add_photo_hint'),
+                                    style:
+                                        const TextStyle(color: Colors.white54)),
                               ],
                             ),
                           )
@@ -225,7 +286,8 @@ class _PalmPageState extends State<PalmPage> {
                   ),
                 ),
               ),
-            ),            const SizedBox(height: 14),
+            ),
+            const SizedBox(height: 14),
             const SizedBox(height: 10),
             Row(children: [
               Expanded(
@@ -237,7 +299,8 @@ class _PalmPageState extends State<PalmPage> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   icon: const Icon(Icons.image, size: 18),
-                  label: Text(AppLocalizations.of(context).t('action.from_gallery')),
+                  label: Text(
+                      AppLocalizations.of(context).t('action.from_gallery')),
                   onPressed: () => _pick(ImageSource.gallery),
                 ),
               ),
@@ -251,13 +314,12 @@ class _PalmPageState extends State<PalmPage> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   icon: const Icon(Icons.photo_camera, size: 18),
-                  label: Text(AppLocalizations.of(context).t('action.from_camera')),
+                  label: Text(
+                      AppLocalizations.of(context).t('action.from_camera')),
                   onPressed: () => _pick(ImageSource.camera),
                 ),
               ),
             ]),
-
-
             const SizedBox(height: 10),
             SafeArea(
               top: false,
@@ -273,7 +335,9 @@ class _PalmPageState extends State<PalmPage> {
                       ),
                       icon: const Icon(Icons.play_circle_outline, size: 18),
                       label: const Text('2 Reklam izle'),
-                      onPressed: image == null ? null : () => _startReading(forceAd: true),
+                      onPressed: image == null
+                          ? null
+                          : () => _startReading(forceAd: true),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -289,7 +353,8 @@ class _PalmPageState extends State<PalmPage> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(AppLocalizations.of(context).t('palm.cta_start')),
+                          Text(
+                              AppLocalizations.of(context).t('palm.cta_start')),
                           const SizedBox(width: 8),
                           const Icon(Icons.monetization_on_outlined, size: 16),
                           const SizedBox(width: 2),
@@ -310,7 +375,7 @@ class _PalmPageState extends State<PalmPage> {
               if (!mounted) return;
               setState(() => scanning = false);
               // Planlı üretim: geri sayım ve reklamla hızlandırma için pending oluştur
-              final eta = const Duration(minutes: 5);
+              final eta = ReadingTiming.initialWaitFor('palm');
               final readyAt = DateTime.now().add(eta);
               String? pendingId;
               try {
@@ -326,6 +391,18 @@ class _PalmPageState extends State<PalmPage> {
                   },
                   locale: locale,
                 );
+                try {
+                  if (pendingId != null) {
+                    final hc = context.read<HistoryController>();
+                    await hc.upsert(HistoryEntry(
+                      id: pendingId,
+                      type: 'palm',
+                      title: AppLocalizations.of(context).t('palm.title'),
+                      text: AppLocalizations.of(context).t('reading.preparing'),
+                      createdAt: DateTime.now(),
+                    ));
+                  }
+                } catch (_) {}
               } catch (_) {}
               if (!mounted) return;
               context.push('/reading/result/palm', extra: {
@@ -354,12 +431,17 @@ class _PalmStarsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final bg = Paint()
-      ..shader = const RadialGradient(colors: [Color(0x332A1B4A), Colors.transparent], radius: 0.6)
-          .createShader(Rect.fromCircle(center: const Offset(80, 60), radius: 160));
+      ..shader = const RadialGradient(
+              colors: [Color(0x332A1B4A), Colors.transparent], radius: 0.6)
+          .createShader(
+              Rect.fromCircle(center: const Offset(80, 60), radius: 160));
     canvas.drawRect(Offset.zero & size, bg);
 
-    final violet = Paint()..color = const Color(0xFF9B79F7).withValues(alpha: 0.18);
-    final gold = Paint()..color = const Color(0xFFFFC857).withValues(alpha: (goldAlpha * 0.6).clamp(0.08, 0.6));
+    final violet = Paint()
+      ..color = const Color(0xFF9B79F7).withValues(alpha: 0.18);
+    final gold = Paint()
+      ..color = const Color(0xFFFFC857)
+          .withValues(alpha: (goldAlpha * 0.6).clamp(0.08, 0.6));
     for (int i = 0; i < starCount; i++) {
       final dx = (i * 71 % size.width).toDouble();
       final dy = (i * 119 % size.height).toDouble();
@@ -369,17 +451,6 @@ class _PalmStarsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _PalmStarsPainter old) => old.goldAlpha != goldAlpha || old.starCount != starCount;
+  bool shouldRepaint(covariant _PalmStarsPainter old) =>
+      old.goldAlpha != goldAlpha || old.starCount != starCount;
 }
-
-
-
-
-
-
-
-
-
-
-
-

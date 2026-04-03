@@ -8,7 +8,11 @@ import '../../core/entitlements/entitlements_controller.dart';
 import '../../core/i18n/app_localizations.dart';
 import '../../core/access/access_gate.dart';
 import '../../core/access/sku_costs.dart';
+import '../../core/readings/pending_readings_service_fixed.dart';
+import '../../core/readings/reading_timing.dart';
 import '../../core/util/stable_user_key.dart';
+import '../history/history_controller.dart';
+import '../history/history_entry.dart';
 import '../profile/profile_controller.dart';
 
 class MotivationPage extends StatefulWidget {
@@ -28,6 +32,8 @@ class _MotivationPageState extends State<MotivationPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _redirectToPendingIfAny());
   }
 
   bool _initialized = false;
@@ -51,12 +57,14 @@ class _MotivationPageState extends State<MotivationPage> {
       } catch (_) {}
       final locale = Localizations.localeOf(context).languageCode;
       final now = DateTime.now();
-      final dateSeed = int.parse('${now.year}${now.month.toString().padLeft(2,'0')}${now.day.toString().padLeft(2,'0')}');
+      final dateSeed = int.parse(
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}');
       final key = _userKey.isNotEmpty ? _userKey : (name + '|' + zodiac);
       final idFactor = key.hashCode & 0x7fffffff;
       final seed = (dateSeed ^ idFactor) & 0x7fffffff;
       final loc = AppLocalizations.of(context);
-      return _buildDailyMessageV2(loc: loc, locale: locale, name: name, zodiac: zodiac, seed: seed);
+      return _buildDailyMessageV2(
+          loc: loc, locale: locale, name: name, zodiac: zodiac, seed: seed);
     } catch (_) {
       return '';
     }
@@ -77,7 +85,8 @@ class _MotivationPageState extends State<MotivationPage> {
       final sp = await SharedPreferences.getInstance();
       final saved = sp.getString(_kUnlockedDate) ?? '';
       final now = DateTime.now();
-      final today = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
+      final today =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       _unlockedToday = saved == today;
       if (_unlockedToday) _text = _buildTodayText();
     } catch (_) {}
@@ -92,16 +101,79 @@ class _MotivationPageState extends State<MotivationPage> {
       await _load();
       return;
     }
-    final ok = await AccessGate.ensureCoinsOnlyOrPaywall(context, coinCost: SkuCosts.motivation);
+    final ok = await AccessGate.ensureCoinsOnlyOrPaywall(context,
+        coinCost: SkuCosts.motivation);
     if (!ok || !mounted) return;
     try {
       final sp = await SharedPreferences.getInstance();
       final now = DateTime.now();
-      final today = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
+      final today =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       await sp.setString(_kUnlockedDate, today);
     } catch (_) {}
     _unlockedToday = true;
-    await _load();
+    await _scheduleTodayMotivation();
+  }
+
+  Future<void> _redirectToPendingIfAny() async {
+    try {
+      final item =
+          await PendingReadingsService.firstPendingOfType('motivation');
+      if (!mounted || item == null) return;
+      final readyAt = DateTime.tryParse((item['readyAt'] as String?) ?? '');
+      if (readyAt == null) return;
+      final pendingId = item['id']?.toString();
+      final extras = (item['extras'] as Map?)?.cast<String, dynamic>() ??
+          <String, dynamic>{};
+      context.push('/reading/result/motivation', extra: {
+        ...extras,
+        'etaSeconds':
+            readyAt.difference(DateTime.now()).inSeconds.clamp(0, 86400),
+        'readyAt': readyAt.toIso8601String(),
+        'generateAtReady': true,
+        if (pendingId != null && pendingId.isNotEmpty) 'pendingId': pendingId,
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _scheduleTodayMotivation() async {
+    if (!mounted) return;
+    final preparedText = _buildTodayText();
+    if (preparedText.trim().isEmpty) return;
+    final eta = ReadingTiming.initialWaitFor('motivation');
+    final readyAt = DateTime.now().add(eta);
+    String? pendingId;
+    try {
+      final locale = Localizations.localeOf(context).languageCode;
+      pendingId = await PendingReadingsService.schedule(
+        type: 'motivation',
+        readyAt: readyAt,
+        extras: {
+          'preparedText': preparedText,
+        },
+        locale: locale,
+      );
+      try {
+        final hc = context.read<HistoryController>();
+        if (pendingId != null) {
+          await hc.upsert(HistoryEntry(
+            id: pendingId,
+            type: 'motivation',
+            title: AppLocalizations.of(context).t('motivation.title'),
+            text: AppLocalizations.of(context).t('reading.preparing'),
+            createdAt: DateTime.now(),
+          ));
+        }
+      } catch (_) {}
+    } catch (_) {}
+    if (!mounted) return;
+    context.push('/reading/result/motivation', extra: {
+      'preparedText': preparedText,
+      'etaSeconds': eta.inSeconds,
+      'readyAt': readyAt.toIso8601String(),
+      'generateAtReady': true,
+      if (pendingId != null) 'pendingId': pendingId,
+    });
   }
 
   Future<void> _load() async {
@@ -126,7 +198,9 @@ class _MotivationPageState extends State<MotivationPage> {
     final now = DateTime.now();
     String date;
     try {
-      date = DateFormat('EEEE, d MMM', Localizations.localeOf(context).toLanguageTag()).format(now);
+      date = DateFormat(
+              'EEEE, d MMM', Localizations.localeOf(context).toLanguageTag())
+          .format(now);
     } catch (_) {
       date = DateFormat('EEEE, d MMM').format(now);
     }
@@ -134,7 +208,9 @@ class _MotivationPageState extends State<MotivationPage> {
       appBar: AppBar(
         title: const Text('Günlük Motivasyon'),
         actions: [
-          IconButton(onPressed: (_loading || !canView) ? null : _load, icon: const Icon(Icons.refresh)),
+          IconButton(
+              onPressed: (_loading || !canView) ? null : _load,
+              icon: const Icon(Icons.refresh)),
         ],
       ),
       body: Padding(
@@ -145,7 +221,10 @@ class _MotivationPageState extends State<MotivationPage> {
             Center(
               child: Text(
                 date,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.white70),
               ),
             ),
             const SizedBox(height: 8),
@@ -194,22 +273,29 @@ class _MotivationPageState extends State<MotivationPage> {
 
   @override
   void dispose() {
-    try { _sub?.cancel(); } catch (_) {}
+    try {
+      _sub?.cancel();
+    } catch (_) {}
     super.dispose();
   }
 }
 
-String _buildDailyMessage({required String locale, required String name, required String zodiac, required int seed}) {
+String _buildDailyMessage(
+    {required String locale,
+    required String name,
+    required String zodiac,
+    required int seed}) {
   // Normalize locale
   final lang = const ['tr', 'en', 'es', 'ar'].contains(locale) ? locale : 'tr';
-  String you = name.isNotEmpty ? name : (
-    {
-      'tr': 'Sevgili ruh',
-      'es': 'Alma querida',
-      'ar': 'صديقي',
-      'en': 'Dear soul',
-    }[lang] ?? 'Dear soul'
-  );
+  String you = name.isNotEmpty
+      ? name
+      : ({
+            'tr': 'Sevgili ruh',
+            'es': 'Alma querida',
+            'ar': 'صديقي',
+            'en': 'Dear soul',
+          }[lang] ??
+          'Dear soul');
 
   List<String> introTr = [
     'Bugün ritmini küçük adımlarla kur.',
@@ -304,11 +390,12 @@ String _buildDailyMessage({required String locale, required String name, require
 
   final z = zodiac.isNotEmpty ? ' (${zodiac})' : '';
   final header = {
-    'tr': '$you$z,',
-    'es': '$you$z,',
-    'ar': '$you$z،',
-    'en': '$you$z,',
-  }[lang] ?? '$you$z,';
+        'tr': '$you$z,',
+        'es': '$you$z,',
+        'ar': '$you$z،',
+        'en': '$you$z,',
+      }[lang] ??
+      '$you$z,';
 
   // Always return a coherent 3-part message (not random single-liners).
   return [header, '', i1, i2, i3].join('\n');
@@ -387,4 +474,3 @@ String _buildDailyMessageV2({
   ];
   return parts.join('\n');
 }
-

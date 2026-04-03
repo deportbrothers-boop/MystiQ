@@ -1,4 +1,5 @@
-﻿import 'dart:io';
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -15,6 +16,7 @@ import '../../../core/entitlements/entitlements_controller.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../../../core/readings/coffee_image_inspector.dart';
 import '../../../core/readings/pending_readings_service_fixed.dart';
+import '../../../core/readings/reading_timing.dart';
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
 import 'package:mystiq/features/readings/coffee/_thumb_slot.dart';
@@ -25,7 +27,8 @@ class CoffeePage extends StatefulWidget {
   State<CoffeePage> createState() => _CoffeePageState();
 }
 
-class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateMixin {
+class _CoffeePageState extends State<CoffeePage>
+    with SingleTickerProviderStateMixin {
   File? cup1;
   File? cup2;
   File? saucer;
@@ -37,12 +40,13 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
   String? _permit;
   String _topic = 'general';
   String _style = 'practical'; // 'practical' | 'spiritual' | 'analytical'
-  static const Duration _defaultEta = Duration(minutes: 10);
+  Duration get _defaultEta => ReadingTiming.initialWaitFor('coffee');
 
   @override
   void initState() {
     super.initState();
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+    _pulse = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
       ..repeat(reverse: true);
     // If a pending coffee exists, redirect directly to Result with countdown
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -52,13 +56,18 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
         final readyAt = DateTime.tryParse((item['readyAt'] as String?) ?? '');
         if (readyAt == null) return;
         final pendingId = item['id']?.toString();
-        final extras = (item['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
-        final paths = (extras['imagePaths'] as List?)?.map((e) => '$e').toList() ?? const <String>[];
+        final extras = (item['extras'] as Map?)?.cast<String, dynamic>() ??
+            <String, dynamic>{};
+        final paths =
+            (extras['imagePaths'] as List?)?.map((e) => '$e').toList() ??
+                const <String>[];
         if (!mounted) return;
         context.push('/reading/result/coffee', extra: {
           if (paths.isNotEmpty) 'imagePaths': paths,
-          if ((extras['permit'] ?? '').toString().trim().isNotEmpty) 'permit': extras['permit'],
-          'etaSeconds': readyAt.difference(DateTime.now()).inSeconds.clamp(0, 86400),
+          if ((extras['permit'] ?? '').toString().trim().isNotEmpty)
+            'permit': extras['permit'],
+          'etaSeconds':
+              readyAt.difference(DateTime.now()).inSeconds.clamp(0, 86400),
           'readyAt': readyAt.toIso8601String(),
           'generateAtReady': true,
           if (pendingId != null && pendingId.isNotEmpty) 'pendingId': pendingId,
@@ -111,7 +120,9 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
               'Hazır olduğunda fincanını tekrar gönderebilirsin.',
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Tamam')),
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Tamam')),
             ],
           ),
         );
@@ -121,6 +132,15 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
 
     await Analytics.log('reading_started', {'type': 'coffee'});
     if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final loc = AppLocalizations.of(context);
+    final adOkText = loc.t('coffee.entry.ad_ok') != 'coffee.entry.ad_ok'
+        ? loc.t('coffee.entry.ad_ok')
+        : '2 reklam izlendi. Sonuc yaklasik 10 dk icinde hazir.';
+    final adFailedText =
+        loc.t('coffee.fast.ad_failed') != 'coffee.fast.ad_failed'
+            ? loc.t('coffee.fast.ad_failed')
+            : 'Reklam gosterilemedi. Tekrar deneyin.';
 
     // Akışlar:
     // - Reklam ile: 2 reklam + 10 dk bekleme
@@ -130,30 +150,47 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
 
     if (viaAd) {
       try {
-        final ok = await RewardedAds.showMultiple(context: context, count: 2, key: 'coffee');
+        final ok = await RewardedAds.showMultiple(
+            context: context, count: 2, key: 'coffee');
         if (!mounted) return;
         if (ok) {
           adUsed = true;
           _permit = await AiGenerationGuard.issuePermit();
           // Reklamdan sonra bekleme 10 dk kalır.
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(
-              AppLocalizations.of(context).t('coffee.entry.ad_ok') != 'coffee.entry.ad_ok'
-                  ? AppLocalizations.of(context).t('coffee.entry.ad_ok')
-                  : '2 reklam izlendi. Sonuç yaklaşık 10 dk içinde hazır.'
-            )),
+          messenger.showSnackBar(
+            SnackBar(content: Text(adOkText)),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(
-              AppLocalizations.of(context).t('coffee.fast.ad_failed') != 'coffee.fast.ad_failed'
-                  ? AppLocalizations.of(context).t('coffee.fast.ad_failed')
-                  : 'Reklam gosterilemedi. Tekrar deneyin.'
-            )),
+          if (kDebugMode) {
+            _permit = await AiGenerationGuard.issuePermit();
+            eta = Duration.zero;
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Debug mod: reklam yuklenemedi, reklam atlandi ve fal dogrudan baslatildi.'),
+              ),
+            );
+          } else {
+            messenger.showSnackBar(SnackBar(content: Text(adFailedText)));
+            return;
+          }
+        }
+      } catch (_) {
+        if (!mounted) return;
+        if (kDebugMode) {
+          _permit = await AiGenerationGuard.issuePermit();
+          eta = Duration.zero;
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Debug mod: reklam akisi hata verdi, reklam atlandi ve fal dogrudan baslatildi.'),
+            ),
           );
+        } else {
+          messenger.showSnackBar(SnackBar(content: Text(adFailedText)));
           return;
         }
-      } catch (_) {}
+      }
     } else {
       // Coin path: no waiting (coin, gerçek para değil)
       final ok = await AccessGate.ensureCoinsOnlyOrPaywall(
@@ -162,7 +199,6 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
       );
       if (!ok || !mounted) return;
       _permit = await AiGenerationGuard.issuePermit();
-      eta = Duration.zero;
     }
 
     if (eta > Duration.zero) {
@@ -184,7 +220,8 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
           // streaming/local flags removed
         };
         final locale = Localizations.localeOf(context).languageCode;
-        final id = await PendingReadingsService.schedule(type: 'coffee', readyAt: readyAt, extras: extras, locale: locale);
+        final id = await PendingReadingsService.schedule(
+            type: 'coffee', readyAt: readyAt, extras: extras, locale: locale);
         _scheduledId = id;
         // Add placeholder to History: "Hazırlanıyor"
         try {
@@ -203,11 +240,16 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
     }
 
     // Her iki akışta da "gönderme" hissi için scanning overlay gösterelim.
-    setState(() { scanning = true; _eta = eta; _adUsed = adUsed; });
+    setState(() {
+      scanning = true;
+      _eta = eta;
+      _adUsed = adUsed;
+    });
   }
 
   Future<void> _pickFor(String slot, ImageSource source) async {
-    final x = await ImagePicker().pickImage(source: source, imageQuality: 85, maxWidth: 1600);
+    final x = await ImagePicker()
+        .pickImage(source: source, imageQuality: 85, maxWidth: 1600);
     if (x == null) return;
     setState(() {
       final f = File(x.path);
@@ -238,7 +280,8 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
             ),
             ListTile(
               leading: const Icon(Icons.emoji_food_beverage_outlined),
-              title: Text(AppLocalizations.of(context).t('coffee.modal.saucer')),
+              title:
+                  Text(AppLocalizations.of(context).t('coffee.modal.saucer')),
               onTap: () => Navigator.pop(context, 'saucer'),
             ),
           ],
@@ -312,11 +355,23 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CoffeeThumbSlot(label: AppLocalizations.of(context).t('coffee.modal.cup1'), file: cup1, onTap: () => _pickForWithChooser('cup1')),
+                    CoffeeThumbSlot(
+                        label:
+                            AppLocalizations.of(context).t('coffee.modal.cup1'),
+                        file: cup1,
+                        onTap: () => _pickForWithChooser('cup1')),
                     const SizedBox(width: 8),
-                    CoffeeThumbSlot(label: AppLocalizations.of(context).t('coffee.modal.cup2'), file: cup2, onTap: () => _pickForWithChooser('cup2')),
+                    CoffeeThumbSlot(
+                        label:
+                            AppLocalizations.of(context).t('coffee.modal.cup2'),
+                        file: cup2,
+                        onTap: () => _pickForWithChooser('cup2')),
                     const SizedBox(width: 8),
-                    CoffeeThumbSlot(label: AppLocalizations.of(context).t('coffee.modal.saucer'), file: saucer, onTap: () => _pickForWithChooser('saucer')),
+                    CoffeeThumbSlot(
+                        label: AppLocalizations.of(context)
+                            .t('coffee.modal.saucer'),
+                        file: saucer,
+                        onTap: () => _pickForWithChooser('saucer')),
                   ],
                 ),
               ),
@@ -329,15 +384,40 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
                     const SizedBox.shrink(),
                     Wrap(
                       spacing: 8,
-                      children: ['general','love','work','money','health'].map((k) {
+                      children: ['general', 'love', 'work', 'money', 'health']
+                          .map((k) {
                         String label;
                         final loc = AppLocalizations.of(context);
                         switch (k) {
-                          case 'love': label = loc.t('coffee.topic.love') != 'coffee.topic.love' ? loc.t('coffee.topic.love') : 'Ask'; break;
-                          case 'work': label = loc.t('coffee.topic.work') != 'coffee.topic.work' ? loc.t('coffee.topic.work') : 'Is'; break;
-                          case 'money': label = loc.t('coffee.topic.money') != 'coffee.topic.money' ? loc.t('coffee.topic.money') : 'Para'; break;
-                          case 'health': label = loc.t('coffee.topic.health') != 'coffee.topic.health' ? loc.t('coffee.topic.health') : 'Saglik'; break;
-                          default: label = loc.t('coffee.topic.general') != 'coffee.topic.general' ? loc.t('coffee.topic.general') : 'Genel';
+                          case 'love':
+                            label = loc.t('coffee.topic.love') !=
+                                    'coffee.topic.love'
+                                ? loc.t('coffee.topic.love')
+                                : 'Ask';
+                            break;
+                          case 'work':
+                            label = loc.t('coffee.topic.work') !=
+                                    'coffee.topic.work'
+                                ? loc.t('coffee.topic.work')
+                                : 'Is';
+                            break;
+                          case 'money':
+                            label = loc.t('coffee.topic.money') !=
+                                    'coffee.topic.money'
+                                ? loc.t('coffee.topic.money')
+                                : 'Para';
+                            break;
+                          case 'health':
+                            label = loc.t('coffee.topic.health') !=
+                                    'coffee.topic.health'
+                                ? loc.t('coffee.topic.health')
+                                : 'Saglik';
+                            break;
+                          default:
+                            label = loc.t('coffee.topic.general') !=
+                                    'coffee.topic.general'
+                                ? loc.t('coffee.topic.general')
+                                : 'Genel';
                         }
                         return ChoiceChip(
                           label: Text(label),
@@ -360,17 +440,22 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
                   ],
                 ),
               ),
-          const SizedBox(height: 10),
+              const SizedBox(height: 10),
               Column(
                 children: [
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.play_circle_outline, size: 18),
-                      onPressed: () async { await _startReading(viaAd: true); },
+                      onPressed: () async {
+                        await _startReading(viaAd: true);
+                      },
                       label: Text(
-                        AppLocalizations.of(context).t('coffee.entry.watch_and_read') != 'coffee.entry.watch_and_read'
-                            ? AppLocalizations.of(context).t('coffee.entry.watch_and_read')
+                        AppLocalizations.of(context)
+                                    .t('coffee.entry.watch_and_read') !=
+                                'coffee.entry.watch_and_read'
+                            ? AppLocalizations.of(context)
+                                .t('coffee.entry.watch_and_read')
                             : '2 Reklam izle, Yorum Al',
                       ),
                     ),
@@ -379,10 +464,14 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      icon: const Icon(Icons.monetization_on_outlined, size: 18),
-                      onPressed: () async { await _startReading(viaAd: false); },
+                      icon:
+                          const Icon(Icons.monetization_on_outlined, size: 18),
+                      onPressed: () async {
+                        await _startReading(viaAd: false);
+                      },
                       label: Consumer<EntitlementsController>(
-                        builder: (_, ent, __) => Text('Coin ile Yorum Al (${SkuCosts.coffeeFast} coin) • Mevcut: ${ent.coins}'),
+                        builder: (_, ent, __) => Text(
+                            'Coin ile Yorum Al (${SkuCosts.coffeeFast} coin) • Mevcut: ${ent.coins}'),
                       ),
                     ),
                   ),
@@ -430,8 +519,3 @@ class _CoffeePageState extends State<CoffeePage> with SingleTickerProviderStateM
     );
   }
 }
-
-
-
-
-

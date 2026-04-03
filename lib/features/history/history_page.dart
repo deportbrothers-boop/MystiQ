@@ -1,4 +1,4 @@
-﻿import '../../core/i18n/app_localizations.dart';
+import '../../core/i18n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +7,7 @@ import 'dart:async';
 import 'history_controller.dart';
 import 'history_entry.dart';
 import '../../core/readings/pending_readings_service_fixed.dart';
+import '../../core/readings/reading_timing.dart';
 import '../profile/profile_controller.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -29,30 +30,38 @@ class _HistoryPageState extends State<HistoryPage> {
     _autoReload?.cancel();
     _autoReload = Timer.periodic(const Duration(seconds: 2), (_) async {
       if (!mounted) return;
-      try { await context.read<HistoryController>().load(); } catch (_) {}
+      try {
+        await context.read<HistoryController>().load();
+      } catch (_) {}
       // Also complete due scheduled readings while on History
       try {
         final hist = context.read<HistoryController>();
         final prof = context.read<ProfileController>();
         final locale = Localizations.localeOf(context).languageCode;
         // ignore: unawaited_futures
-        PendingReadingsService.checkAndCompleteDue(history: hist, profile: prof, locale: locale);
+        PendingReadingsService.checkAndCompleteDue(
+            history: hist, profile: prof, locale: locale);
       } catch (_) {}
     });
   }
 
   @override
   void dispose() {
-    try { _autoReload?.cancel(); } catch (_) {}
+    try {
+      _autoReload?.cancel();
+    } catch (_) {}
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final hc = context.watch<HistoryController>();
-    final items = hc.items.where((e) => _filter == 'all' ? true : e.type == _filter).toList();
+    final items = hc.items
+        .where((e) => _filter == 'all' ? true : e.type == _filter)
+        .toList();
     return Scaffold(
-      appBar: AppBar(title: Text(AppLocalizations.of(context).t('nav.history'))),
+      appBar:
+          AppBar(title: Text(AppLocalizations.of(context).t('nav.history'))),
       body: Column(
         children: [
           Padding(
@@ -66,6 +75,8 @@ class _HistoryPageState extends State<HistoryPage> {
                 _chip('palm', AppLocalizations.of(context).t('palm.title')),
                 _chip('dream', AppLocalizations.of(context).t('dream.title')),
                 _chip('astro', AppLocalizations.of(context).t('astro.title')),
+                _chip('motivation',
+                    AppLocalizations.of(context).t('motivation.title')),
               ],
             ),
           ),
@@ -113,64 +124,11 @@ class _HistoryCard extends StatelessWidget {
       onDismissed: (_) => hc.delete(entry.id),
       child: InkWell(
         onTap: () async {
-          if (entry.type == 'coffee') {
-            try {
-              final item = await PendingReadingsService.firstPendingOfType('coffee');
-              // Sadece bu entry ile ilişkili pending için hızlandırma akışına gir.
-              if ((item?['id'] as String?) != entry.id) {
-                context.push('/reading/result/${entry.type}', extra: entry);
-                return;
-              }
-              final raStr = (item?['readyAt'] as String?) ?? '';
-              final readyAt = DateTime.tryParse(raStr);
-              if (readyAt != null && readyAt.isAfter(DateTime.now())) {
-                final id = item?['id'] as String?;
-                final extras0 = (item?['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
-                final eta0 = readyAt.difference(DateTime.now());
-                if (!context.mounted) return;
-                context.push('/reading/result/coffee', extra: {
-                  if ((extras0['imagePaths'] is List)) 'imagePaths': (extras0['imagePaths'] as List),
-                  if ((extras0['permit'] ?? '').toString().trim().isNotEmpty) 'permit': extras0['permit'],
-                  'etaSeconds': eta0.inSeconds.clamp(0, 86400),
-                  'readyAt': readyAt.toIso8601String(),
-                  'generateAtReady': true,
-                  if (id != null) 'pendingId': id,
-                });
-                return;
-              }
-            } catch (_) {}
-          } else if (entry.type == 'tarot') {
-            try {
-              final item = await PendingReadingsService.firstPendingOfType('tarot');
-              // Sadece bu entry ile ilişkili pending için hızlandırma akışına gir.
-              if ((item?['id'] as String?) != entry.id) {
-                context.push('/reading/result/${entry.type}', extra: entry);
-                return;
-              }
-              final raStr = (item?['readyAt'] as String?) ?? '';
-              final readyAt = DateTime.tryParse(raStr);
-              if (readyAt != null && readyAt.isAfter(DateTime.now())) {
-                final id = item?['id'] as String?;
-                if (id == null) {
-                  context.push('/reading/result/${entry.type}', extra: entry);
-                  return;
-                }
-                final extras0 = (item?['extras'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
-                final eta0 = readyAt.difference(DateTime.now());
-                if (!context.mounted) return;
-                context.push('/reading/result/tarot', extra: {
-                  if ((extras0['cards'] is List)) 'cards': (extras0['cards'] as List),
-                  if ((extras0['cardIndices'] is List)) 'cardIndices': (extras0['cardIndices'] as List),
-                  if ((extras0['reversed'] is List)) 'reversed': (extras0['reversed'] as List),
-                  if ((extras0['permit'] ?? '').toString().trim().isNotEmpty) 'permit': extras0['permit'],
-                  'etaSeconds': eta0.inSeconds.clamp(0, 86400),
-                  'readyAt': readyAt.toIso8601String(),
-                  'generateAtReady': true,
-                  'pendingId': id,
-                });
-                return;
-              }
-            } catch (_) {}
+          final pendingExtra = await _pendingExtra();
+          if (pendingExtra != null) {
+            if (!context.mounted) return;
+            context.push('/reading/result/${entry.type}', extra: pendingExtra);
+            return;
           }
           context.push('/reading/result/${entry.type}', extra: entry);
         },
@@ -206,25 +164,35 @@ class _HistoryCard extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: color.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: color.withValues(alpha: 0.4)),
+                            border:
+                                Border.all(color: color.withValues(alpha: 0.4)),
                           ),
-                          child: Text(entry.type.toUpperCase(), style: TextStyle(color: color, fontSize: 11)),
+                          child: Text(entry.type.toUpperCase(),
+                              style: TextStyle(color: color, fontSize: 11)),
                         ),
                         const SizedBox(width: 8),
-                        Text(date, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text(date,
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 12)),
                         const Spacer(),
                         IconButton(
-                          icon: Icon(entry.favorite ? Icons.star : Icons.star_border, color: entry.favorite ? Colors.amber : Colors.white60),
+                          icon: Icon(
+                              entry.favorite ? Icons.star : Icons.star_border,
+                              color: entry.favorite
+                                  ? Colors.amber
+                                  : Colors.white60),
                           onPressed: () => hc.toggleFavorite(entry.id),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(entry.title, style: Theme.of(context).textTheme.titleMedium),
+                    Text(entry.title,
+                        style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 6),
                     Text(
                       _clip(entry.text),
@@ -247,6 +215,29 @@ class _HistoryCard extends StatelessWidget {
     return s.length > 140 ? s.substring(0, 140) + '...' : s;
   }
 
+  Future<Map<String, dynamic>?> _pendingExtra() async {
+    if (!ReadingTiming.supportsPendingTimer(entry.type)) return null;
+    try {
+      final item = await PendingReadingsService.firstPendingOfType(entry.type);
+      if ((item?['id'] as String?) != entry.id) return null;
+      final readyAt = DateTime.tryParse((item?['readyAt'] as String?) ?? '');
+      if (readyAt == null || !readyAt.isAfter(DateTime.now())) return null;
+      final pendingId = item?['id'] as String?;
+      final extras = (item?['extras'] as Map?)?.cast<String, dynamic>() ??
+          <String, dynamic>{};
+      return {
+        ...extras,
+        'etaSeconds':
+            readyAt.difference(DateTime.now()).inSeconds.clamp(0, 86400),
+        'readyAt': readyAt.toIso8601String(),
+        'generateAtReady': true,
+        if (pendingId != null && pendingId.isNotEmpty) 'pendingId': pendingId,
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
   IconData _icon(String t) {
     switch (t) {
       case 'coffee':
@@ -259,6 +250,8 @@ class _HistoryCard extends StatelessWidget {
         return Icons.nightlight_round;
       case 'astro':
         return Icons.brightness_2_outlined;
+      case 'motivation':
+        return Icons.self_improvement_outlined;
       default:
         return Icons.auto_awesome;
     }
@@ -276,6 +269,8 @@ class _HistoryCard extends StatelessWidget {
         return const Color(0xFF7DA6FF);
       case 'astro':
         return const Color(0xFFFFC857);
+      case 'motivation':
+        return const Color(0xFFFF9F6E);
       default:
         return Colors.amber;
     }
@@ -292,20 +287,10 @@ class _EmptyState extends StatelessWidget {
         children: [
           const Icon(Icons.auto_awesome, size: 48, color: Colors.white38),
           const SizedBox(height: 8),
-          Text(AppLocalizations.of(context).t('history.empty'), style: const TextStyle(color: Colors.white70)),
+          Text(AppLocalizations.of(context).t('history.empty'),
+              style: const TextStyle(color: Colors.white70)),
         ],
       ),
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
