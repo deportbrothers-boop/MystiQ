@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -15,27 +15,39 @@ class AiConfig {
   final String streamUrl; // optional
   final String model;
   final String appToken; // optional
-  AiConfig({required this.serverUrl, required this.model, this.streamUrl = '', this.appToken = ''});
+  AiConfig(
+      {required this.serverUrl,
+      required this.model,
+      this.streamUrl = '',
+      this.appToken = ''});
   static Future<AiConfig> load() async {
     // Prefer compile-time overrides to avoid bundling gizli anahtarlar
-    var server = const String.fromEnvironment('AI_SERVER_URL', defaultValue: '');
-    var stream = const String.fromEnvironment('AI_STREAM_URL', defaultValue: '');
-    var model = const String.fromEnvironment('AI_MODEL', defaultValue: 'gpt-4o-mini');
+    var server =
+        const String.fromEnvironment('AI_SERVER_URL', defaultValue: '');
+    var stream =
+        const String.fromEnvironment('AI_STREAM_URL', defaultValue: '');
+    var model =
+        const String.fromEnvironment('AI_MODEL', defaultValue: 'gpt-4o-mini');
     var token = const String.fromEnvironment('AI_APP_TOKEN', defaultValue: '');
     Map<String, dynamic>? j;
     try {
       final txt = await rootBundle.loadString('assets/config/ai.json');
       j = json.decode(txt) as Map<String, dynamic>;
     } catch (_) {}
-    server = server.isNotEmpty ? server : (j?['serverUrl'] ?? '') as String? ?? '';
-    stream = stream.isNotEmpty ? stream : (j?['streamUrl'] ?? '') as String? ?? '';
-    model = model.isNotEmpty ? model : (j?['model'] ?? 'gpt-4o-mini') as String? ?? 'gpt-4o-mini';
+    server =
+        server.isNotEmpty ? server : (j?['serverUrl'] ?? '') as String? ?? '';
+    stream =
+        stream.isNotEmpty ? stream : (j?['streamUrl'] ?? '') as String? ?? '';
+    model = model.isNotEmpty
+        ? model
+        : (j?['model'] ?? 'gpt-4o-mini') as String? ?? 'gpt-4o-mini';
     token = token.isNotEmpty ? token : (j?['appToken'] ?? '') as String? ?? '';
     // Strip obvious placeholder tokens to keep release paketlerinde gizli anahtar saklanmamasi
     if (token.startsWith('UZUN_') || token.toLowerCase().contains('token')) {
       token = '';
     }
-    return AiConfig(serverUrl: server, model: model, streamUrl: stream, appToken: token);
+    return AiConfig(
+        serverUrl: server, model: model, streamUrl: stream, appToken: token);
   }
 }
 
@@ -74,7 +86,8 @@ class AiService {
       return _generateTarot(profile: profile, extras: extras, locale: locale);
     }
     if (type == 'palm' || type == 'dream' || type == 'astro') {
-      return _generateLongSymbolic(type: type, profile: profile, extras: extras, locale: locale);
+      return _generateLongSymbolic(
+          type: type, profile: profile, extras: extras, locale: locale);
     }
 
     // Diğer içerikler: yerel üretim.
@@ -97,6 +110,7 @@ class AiService {
   static const int _longMinChars = 900;
   static const int _longMaxChars = 1500;
   static const String _coffeeIntroSigKey = 'coffee_intro_sig_v1';
+  static const Duration _httpRequestTimeout = Duration(seconds: 120);
 
   static Future<String?> _loadCoffeeIntroSig() async {
     try {
@@ -117,7 +131,8 @@ class AiService {
   }
 
   static String _sigFromIntro(String s) {
-    final oneLine = s.replaceAll('\r\n', '\n').split('\n').first.trim().toLowerCase();
+    final oneLine =
+        s.replaceAll('\r\n', '\n').split('\n').first.trim().toLowerCase();
     return oneLine.length <= 120 ? oneLine : oneLine.substring(0, 120);
   }
 
@@ -154,11 +169,12 @@ class AiService {
             Uri.parse(server),
             headers: {
               HttpHeaders.contentTypeHeader: 'application/json',
-              if (cfg.appToken.isNotEmpty) HttpHeaders.authorizationHeader: 'Bearer ${cfg.appToken}',
+              if (cfg.appToken.isNotEmpty)
+                HttpHeaders.authorizationHeader: 'Bearer ${cfg.appToken}',
             },
             body: json.encode(payload),
           )
-          .timeout(const Duration(seconds: 35));
+          .timeout(_httpRequestTimeout);
       if (r.statusCode >= 200 && r.statusCode < 300) {
         final j = json.decode(r.body) as Map<String, dynamic>;
         final text = (j['text'] as String?)?.trim();
@@ -175,7 +191,8 @@ class AiService {
   }) async {
     final cfg = await AiConfig.load();
     final prevSig = await _loadCoffeeIntroSig();
-    final userName = profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
+    final userName =
+        profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
 
     final baseExtras = <String, dynamic>{
       ...(extras ?? const <String, dynamic>{}),
@@ -191,7 +208,10 @@ class AiService {
 
     String last = '';
     for (var attempt = 0; attempt < 3; attempt++) {
-      final attemptExtras = <String, dynamic>{...baseExtras, 'attempt': attempt};
+      final attemptExtras = <String, dynamic>{
+        ...baseExtras,
+        'attempt': attempt
+      };
       final raw = await _tryRemoteOnce(
             type: 'coffee',
             profile: profile,
@@ -200,7 +220,11 @@ class AiService {
             cfg: cfg,
             attempt: attempt,
           ) ??
-          LocalAIGenerator.generate(type: 'coffee', profile: profile, extras: attemptExtras, locale: locale);
+          LocalAIGenerator.generate(
+              type: 'coffee',
+              profile: profile,
+              extras: attemptExtras,
+              locale: locale);
 
       final formatted = _formatCoffeeReading(
         raw: raw,
@@ -210,7 +234,8 @@ class AiService {
         attempt: attempt,
       );
       last = formatted;
-      if (formatted.length >= _coffeeMinChars && formatted.length <= _coffeeMaxChars) {
+      if (formatted.length >= _coffeeMinChars &&
+          formatted.length <= _coffeeMaxChars) {
         await _saveCoffeeIntroSig(_sigFromIntro(formatted));
         return formatted;
       }
@@ -226,7 +251,8 @@ class AiService {
     String locale = 'tr',
   }) async {
     final cfg = await AiConfig.load();
-    final userName = profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
+    final userName =
+        profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
 
     final baseExtras = <String, dynamic>{
       ...(extras ?? const <String, dynamic>{}),
@@ -239,7 +265,10 @@ class AiService {
 
     String last = '';
     for (var attempt = 0; attempt < 3; attempt++) {
-      final attemptExtras = <String, dynamic>{...baseExtras, 'attempt': attempt};
+      final attemptExtras = <String, dynamic>{
+        ...baseExtras,
+        'attempt': attempt
+      };
       final raw = await _tryRemoteOnce(
             type: 'tarot',
             profile: profile,
@@ -248,7 +277,11 @@ class AiService {
             cfg: cfg,
             attempt: attempt,
           ) ??
-          LocalAIGenerator.generate(type: 'tarot', profile: profile, extras: attemptExtras, locale: locale);
+          LocalAIGenerator.generate(
+              type: 'tarot',
+              profile: profile,
+              extras: attemptExtras,
+              locale: locale);
 
       var out = postProcessTarotText(raw);
 
@@ -265,7 +298,8 @@ class AiService {
       }
 
       last = _clampToRange(out, min: _tarotMinChars, max: _tarotMaxChars);
-      if (last.length >= _tarotMinChars && last.length <= _tarotMaxChars) return last;
+      if (last.length >= _tarotMinChars && last.length <= _tarotMaxChars)
+        return last;
     }
 
     return last.isNotEmpty
@@ -280,7 +314,8 @@ class AiService {
     String locale = 'tr',
   }) async {
     final cfg = await AiConfig.load();
-    final userName = profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
+    final userName =
+        profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
 
     final baseExtras = <String, dynamic>{
       ...(extras ?? const <String, dynamic>{}),
@@ -295,7 +330,10 @@ class AiService {
 
     String last = '';
     for (var attempt = 0; attempt < 3; attempt++) {
-      final attemptExtras = <String, dynamic>{...baseExtras, 'attempt': attempt};
+      final attemptExtras = <String, dynamic>{
+        ...baseExtras,
+        'attempt': attempt
+      };
       final raw = await _tryRemoteOnce(
             type: type,
             profile: profile,
@@ -304,7 +342,11 @@ class AiService {
             cfg: cfg,
             attempt: attempt,
           ) ??
-          LocalAIGenerator.generate(type: type, profile: profile, extras: attemptExtras, locale: locale);
+          LocalAIGenerator.generate(
+              type: type,
+              profile: profile,
+              extras: attemptExtras,
+              locale: locale);
 
       var out = postProcessSymbolicText(raw);
 
@@ -321,7 +363,8 @@ class AiService {
       }
 
       last = _clampToRange(out, min: _longMinChars, max: _longMaxChars);
-      if (last.length >= _longMinChars && last.length <= _longMaxChars) return last;
+      if (last.length >= _longMinChars && last.length <= _longMaxChars)
+        return last;
     }
 
     return last.isNotEmpty
@@ -368,7 +411,8 @@ class AiService {
     String locale = 'tr',
   }) async* {
     if (type != 'coffee' && type != 'tarot') {
-      final full = await generate(type: type, profile: profile, extras: extras, locale: locale);
+      final full = await generate(
+          type: type, profile: profile, extras: extras, locale: locale);
       final parts = full.split(' ');
       final buf = StringBuffer();
       for (var i = 0; i < parts.length; i++) {
@@ -404,15 +448,17 @@ class AiService {
         try {
           final httpReq = http.Request('POST', Uri.parse(streamUrl));
           httpReq.headers[HttpHeaders.contentTypeHeader] = 'application/json';
-          if (cfg.appToken.isNotEmpty) httpReq.headers[HttpHeaders.authorizationHeader] = 'Bearer ${cfg.appToken}';
+          if (cfg.appToken.isNotEmpty)
+            httpReq.headers[HttpHeaders.authorizationHeader] =
+                'Bearer ${cfg.appToken}';
           httpReq.body = json.encode(req);
-          final streamed = await client
-              .send(httpReq)
-              .timeout(const Duration(seconds: 30));
+          final streamed =
+              await client.send(httpReq).timeout(_httpRequestTimeout);
           if (streamed.statusCode >= 200 && streamed.statusCode < 300) {
             final buf = StringBuffer();
             var carry = '';
-            await for (final chunk in streamed.stream.transform(const Utf8Decoder())) {
+            await for (final chunk
+                in streamed.stream.transform(const Utf8Decoder())) {
               // Try to parse SSE-like lines first; otherwise, treat as plain text stream
               final combined = carry + chunk;
               final lines = combined.split(RegExp('\\r?\\n'));
@@ -453,11 +499,12 @@ class AiService {
                   Uri.parse(streamUrl),
                   headers: {
                     HttpHeaders.contentTypeHeader: 'application/json',
-                    if (cfg.appToken.isNotEmpty) HttpHeaders.authorizationHeader: 'Bearer ${cfg.appToken}',
+                    if (cfg.appToken.isNotEmpty)
+                      HttpHeaders.authorizationHeader: 'Bearer ${cfg.appToken}',
                   },
                   body: json.encode(req),
                 )
-                .timeout(const Duration(seconds: 30));
+                .timeout(_httpRequestTimeout);
             final body = r.body.trim();
             if (body.isNotEmpty) {
               final parts = body.split(RegExp("\\s+"));
@@ -481,12 +528,15 @@ class AiService {
           // Fall through to local generation
         } finally {
           // Ensure client closed even if exceptions occur
-          try { client.close(); } catch (_) {}
+          try {
+            client.close();
+          } catch (_) {}
         }
       } catch (_) {}
     }
 
-    final full = await generate(type: type, profile: profile, extras: extras, locale: locale);
+    final full = await generate(
+        type: type, profile: profile, extras: extras, locale: locale);
     final parts = full.split(' ');
     final buf = StringBuffer();
     for (var i = 0; i < parts.length; i++) {
@@ -499,10 +549,13 @@ class AiService {
     }
   }
 
-  static Future<Map<String, dynamic>> _prepareInputs(Map<String, dynamic>? extras) async {
+  static Future<Map<String, dynamic>> _prepareInputs(
+      Map<String, dynamic>? extras) async {
     extras ??= {};
     final out = <String, dynamic>{};
-    if (!kIsWeb && extras['imagePaths'] is List && (extras['imagePaths'] as List).isNotEmpty) {
+    if (!kIsWeb &&
+        extras['imagePaths'] is List &&
+        (extras['imagePaths'] as List).isNotEmpty) {
       final paths = (extras['imagePaths'] as List).whereType<String>().toList();
       final b64s = <String>[];
       for (final p in paths) {
@@ -523,13 +576,11 @@ class AiService {
       final names = (extras['cards'] as List).map((e) => '$e').toList();
       // If reversed flags are present, annotate names accordingly so server can reflect it in text
       if (extras['reversed'] is List) {
-        final revs = (extras['reversed'] as List)
-            .map((e) {
-              if (e is bool) return e;
-              final s = '$e'.toLowerCase();
-              return s == 'true' || s == '1' || s == 'yes';
-            })
-            .toList();
+        final revs = (extras['reversed'] as List).map((e) {
+          if (e is bool) return e;
+          final s = '$e'.toLowerCase();
+          return s == 'true' || s == '1' || s == 'yes';
+        }).toList();
         for (var i = 0; i < names.length && i < revs.length; i++) {
           if (revs[i] == true) names[i] = '${names[i]} (reversed)';
         }
@@ -542,8 +593,7 @@ class AiService {
     final typeHint = (extras['typeHint'] ?? '').toString();
     if (typeHint == 'coffee') {
       final prev = (extras['prevIntroSig'] ?? '').toString().trim();
-      out['styleHintTr'] =
-          'MYSTIQ – Kahve Yorumu çıktı kuralları:\n'
+      out['styleHintTr'] = 'MYSTIQ – Kahve Yorumu çıktı kuralları:\n'
           '1) Kullanıcı adı mutlaka geçmeli: ilk paragraf "${(extras['userName'] ?? '').toString().trim()}, ..." diye başlamalı ve isim toplam 1–2 kez geçmeli.\n'
           '2) Uzunluk: 900–1500 karakter; 4–5 kısa paragraf akıcı anlatım.\n'
           '3) Ton: sıcak, samimi, sezgisel. Kesin hüküm yok; "olacak/kesin" yok. Gelecek tahmini yok.\n'
@@ -569,8 +619,7 @@ class AiService {
     // Other long symbolic readings (no future/certainty/timing)
     if (typeHint == 'dream' || typeHint == 'palm' || typeHint == 'astro') {
       final userName = (extras['userName'] ?? '').toString().trim();
-      out['styleHintTr'] =
-          'Sistem yönergesi (zorunlu):\n'
+      out['styleHintTr'] = 'Sistem yönergesi (zorunlu):\n'
           'Sen sembolik bir yorumlayıcısısın. Gelecek hakkında tahmin yapma. Tarih verme. Kesinlik iddiasında bulunma.\n'
           '“Olacak” yerine “çağrıştırıyor/izlenim veriyor/sembol olarak yorumlanabilir” kullan.\n'
           'Yorumların yalnızca eğlence amaçlı sembolik çağrışımlara dayanmalı.\n'
@@ -588,12 +637,15 @@ class AiService {
     return out;
   }
 
-  static const String _coffeeNeutralSuffix = 'Bu içerik eğlence amaçlıdır; kesinlik içermez.';
+  static const String _coffeeNeutralSuffix =
+      'Bu içerik eğlence amaçlıdır; kesinlik içermez.';
   static final RegExp _coffeeBannedWordRe = RegExp(
     r'\\b(olacak|olacaklar|kesin|garanti|mutlaka|yakinda|yakında|ileride|gelecekte|su\\s+tarihte|şu\\s+tarihte)\\b',
     caseSensitive: false,
   );
-  static final RegExp _coffeeDateRe = RegExp(r'\\b\\d{1,2}[./-]\\d{1,2}([./-]\\d{2,4})?\\b', caseSensitive: false);
+  static final RegExp _coffeeDateRe = RegExp(
+      r'\\b\\d{1,2}[./-]\\d{1,2}([./-]\\d{2,4})?\\b',
+      caseSensitive: false);
   static final RegExp _coffeeMonthRe = RegExp(
     r'\\b\\d{1,2}\\s*(ocak|subat|şubat|mart|nisan|mayıs|mayis|haziran|temmuz|ağustos|agustos|eylül|eylul|ekim|kasım|kasim|aralık|aralik)\\b',
     caseSensitive: false,
@@ -610,14 +662,18 @@ class AiService {
   static String postProcessCoffeeText(String input) {
     // Bu fonksiyon artık formatı bozmayacak şekilde minimal temizlik yapar.
     var out = input.replaceAll('\r\n', '\n').trim();
-    if (out.isEmpty) out = 'Kahve Yorumu\n\nFincandaki şekiller sembolik çağrışımlar veriyor.';
+    if (out.isEmpty)
+      out = 'Kahve Yorumu\n\nFincandaki şekiller sembolik çağrışımlar veriyor.';
 
     // Banned/time cümleleri temizle (satır bazlı, mini öneri madde satırlarını koru)
     final lines = out.split('\n');
     final kept = <String>[];
     for (final line in lines) {
       final t = line.trimRight();
-      if (t.trim().isEmpty) { kept.add(''); continue; }
+      if (t.trim().isEmpty) {
+        kept.add('');
+        continue;
+      }
       // Mini öneriler satırları kısa ve güvenli olmalı; filtrelemeden geçir ama yapıyı koru
       if (_shouldDropCoffeeSentence(t)) continue;
       kept.add(t);
@@ -642,7 +698,10 @@ class AiService {
     final kept = <String>[];
     for (final line in lines) {
       final t = line.trimRight();
-      if (t.trim().isEmpty) { kept.add(''); continue; }
+      if (t.trim().isEmpty) {
+        kept.add('');
+        continue;
+      }
       if (_shouldDropCoffeeSentence(t)) continue;
       kept.add(t);
     }
@@ -673,7 +732,8 @@ class AiService {
     }
     out = kept.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
 
-    if (!_containsCoffeeDisclaimer(out) || !out.endsWith(_coffeeNeutralSuffix)) {
+    if (!_containsCoffeeDisclaimer(out) ||
+        !out.endsWith(_coffeeNeutralSuffix)) {
       out = '$out\n\n$_coffeeNeutralSuffix'.trim();
     }
     return out;
@@ -720,7 +780,15 @@ class AiService {
   }
 
   static String _weekdayTr(DateTime now) {
-    const names = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+    const names = [
+      'Pazartesi',
+      'Salı',
+      'Çarşamba',
+      'Perşembe',
+      'Cuma',
+      'Cumartesi',
+      'Pazar'
+    ];
     return names[((now.weekday - 1) % 7).clamp(0, 6)];
   }
 
@@ -743,7 +811,8 @@ class AiService {
     }
 
     final now = DateTime.now();
-    final dow = locale.startsWith('tr') ? _weekdayTr(now) : now.weekday.toString();
+    final dow =
+        locale.startsWith('tr') ? _weekdayTr(now) : now.weekday.toString();
     final rnd = Random(now.millisecondsSinceEpoch + attempt * 9973);
 
     final openings = <String>[
@@ -756,7 +825,8 @@ class AiService {
     final candidateIntro = 'Kahve Yorumu\n\n$userName, $opening';
     if (prevIntroSig != null && prevIntroSig.trim().isNotEmpty) {
       if (_sigFromIntro(candidateIntro) == prevIntroSig.trim().toLowerCase()) {
-        opening = openings[(rnd.nextInt(openings.length - 1) + 1) % openings.length];
+        opening =
+            openings[(rnd.nextInt(openings.length - 1) + 1) % openings.length];
       }
     }
 
@@ -810,7 +880,8 @@ class AiService {
       '${ctas[rnd.nextInt(ctas.length)]}\n\n$_coffeeNeutralSuffix',
     ];
 
-    var out = paragraphs.join('\n\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+    var out =
+        paragraphs.join('\n\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
 
     // Uzunluk hedefi: kısa kalırsa gözlem cümlelerini genişlet
     if (out.length < _coffeeMinChars) {
@@ -872,7 +943,9 @@ class AiService {
     // Remove disclaimer temporarily; we will append again after outro.
     var body = out;
     if (body.endsWith(_coffeeNeutralSuffix)) {
-      body = body.substring(0, body.length - _coffeeNeutralSuffix.length).trimRight();
+      body = body
+          .substring(0, body.length - _coffeeNeutralSuffix.length)
+          .trimRight();
     }
 
     final marker = 'bu fincanda söylenebilecekler şimdilik bu kadar';
@@ -882,13 +955,15 @@ class AiService {
 
     // If too short, pad slightly (still symbolic).
     if (body.length < _coffeeMinChars - 180) {
-      body = '$body\n\nBu satırlar bir kehanet değil; fincandaki şekillerin sembolik çağrışımları olarak yorumlanabilir.';
+      body =
+          '$body\n\nBu satırlar bir kehanet değil; fincandaki şekillerin sembolik çağrışımları olarak yorumlanabilir.';
     }
 
     return '$body\n\n$_coffeeNeutralSuffix'.trim();
   }
 
-  static String _clampCoffeeWithOutro(String input, {required String userName}) {
+  static String _clampCoffeeWithOutro(String input,
+      {required String userName}) {
     var out = input.replaceAll('\r\n', '\n').trim();
     if (out.length <= _coffeeMaxChars) return out;
 
@@ -902,7 +977,8 @@ class AiService {
 
     // Keep the ending block intact; trim earlier body to fit max.
     final endBlock = '\n\n$outro\n\n$_coffeeNeutralSuffix';
-    final allowedBody = (_coffeeMaxChars - endBlock.length).clamp(200, _coffeeMaxChars);
+    final allowedBody =
+        (_coffeeMaxChars - endBlock.length).clamp(200, _coffeeMaxChars);
 
     var body = out.substring(0, idx).trimRight();
     body = _clampToRange(body, min: 0, max: allowedBody);
@@ -926,7 +1002,8 @@ class AiService {
 
   static bool _containsCoffeeDisclaimer(String text) {
     final lower = text.toLowerCase();
-    return lower.contains('eğlence amaçlıdır') || lower.contains('eglence amaclidir');
+    return lower.contains('eğlence amaçlıdır') ||
+        lower.contains('eglence amaclidir');
   }
 
   static Map<String, dynamic> _contextInfo({String locale = 'tr'}) {
@@ -934,7 +1011,8 @@ class AiService {
     return {
       'now': now.toIso8601String(),
       'weekday': now.weekday,
-      'dayOfYear': int.parse('${now.difference(DateTime(now.year)).inDays + 1}'),
+      'dayOfYear':
+          int.parse('${now.difference(DateTime(now.year)).inDays + 1}'),
       'locale': locale,
       'app': 'MystiQ',
     };

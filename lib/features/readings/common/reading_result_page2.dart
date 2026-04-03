@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,8 +28,10 @@ import '../../../core/ads/rewarded_helper.dart';
 class ReadingResultPage extends StatefulWidget {
   final String type; // coffee | tarot | palm | dream | astro
   final String? providedText; // from history
-  final Map<String, dynamic>? requestExtras; // imagePath, text, cardIndices, delay, unlockMethod
-  const ReadingResultPage({super.key, required this.type, this.providedText, this.requestExtras});
+  final Map<String, dynamic>?
+      requestExtras; // imagePath, text, cardIndices, delay, unlockMethod
+  const ReadingResultPage(
+      {super.key, required this.type, this.providedText, this.requestExtras});
 
   @override
   State<ReadingResultPage> createState() => _ReadingResultPageState();
@@ -49,7 +51,8 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
   bool _speedupUsed = false;
   bool _speedingUp = false;
 
-  bool _isAiFailure(String s) => s.trim().startsWith('Uretim su anda yapilamiyor');
+  bool _isAiFailure(String s) =>
+      s.trim().startsWith('Uretim su anda yapilamiyor');
 
   static const Duration _coffeeInitialEta = Duration(minutes: 10);
   static const Duration _speedupTargetEta = Duration(minutes: 5);
@@ -80,7 +83,8 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       );
     } catch (_) {
       if (widget.type == 'coffee') {
-        final name = profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
+        final name =
+            profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
         return 'Kahve Yorumu\n\n$name, fincandaki şekiller sembolik çağrışımlar veriyor.\n\nBugünün Mini Önerileri:\n- Bugün kısa bir mesajla bağ kur.\n- 2 dakika nefesle sakinleş.\n\nFincanın sonuna geliyorken, yeni bir fincanla tekrar geldiğinde kaldığımız yerden devam ederiz.\n\nBu içerik eğlence amaçlıdır; kesinlik içermez.';
       }
       return 'Yorum şu an oluşturulamadı; biraz sonra tekrar deneyebilirsin.\n\nBu içerik eğlence amaçlıdır; kesinlik içermez.';
@@ -93,11 +97,20 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       if (ent.lastUnlockMethod != 'coins') return;
       int cost = 0;
       switch (widget.type) {
-        case 'dream': cost = SkuCosts.dream; break;
-        case 'tarot': cost = SkuCosts.tarotDeep; break;
-        case 'coffee': cost = SkuCosts.coffeeFast; break;
-        case 'palm': cost = SkuCosts.palmPremium; break;
-        default: return;
+        case 'dream':
+          cost = SkuCosts.dream;
+          break;
+        case 'tarot':
+          cost = SkuCosts.tarotDeep;
+          break;
+        case 'coffee':
+          cost = SkuCosts.coffeeFast;
+          break;
+        case 'palm':
+          cost = SkuCosts.palmPremium;
+          break;
+        default:
+          return;
       }
       await ent.addCoins(cost);
     } catch (_) {}
@@ -106,7 +119,9 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
   @override
   void initState() {
     super.initState();
-    try { _pendingId = (widget.requestExtras?['pendingId'] as String?); } catch (_) {}
+    try {
+      _pendingId = (widget.requestExtras?['pendingId'] as String?);
+    } catch (_) {}
     _initCountdownFromExtras();
     if (widget.providedText != null) {
       text = widget.providedText!;
@@ -115,7 +130,10 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         text = AiService.postProcessCoffeeText(text);
       }
       _saved = !_placeholderProvided;
-      final hasPermit = ((widget.requestExtras?['permit'] ?? '').toString().trim().isNotEmpty);
+      final hasPermit = ((widget.requestExtras?['permit'] ?? '')
+          .toString()
+          .trim()
+          .isNotEmpty);
       if (_placeholderProvided && hasPermit) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _generateAndSave());
       }
@@ -134,7 +152,9 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
 
   @override
   void dispose() {
-    try { _countdown?.cancel(); } catch (_) {}
+    try {
+      _countdown?.cancel();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -172,7 +192,8 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       _readyAt = target;
       _tickCountdown();
       _countdown?.cancel();
-      _countdown = Timer.periodic(const Duration(seconds: 1), (_) => _tickCountdown());
+      _countdown =
+          Timer.periodic(const Duration(seconds: 1), (_) => _tickCountdown());
     } catch (_) {}
   }
 
@@ -189,7 +210,8 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       if (!mounted) return;
       if (!ok) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reklam gösterilemedi. Tekrar deneyin.')),
+          const SnackBar(
+              content: Text('Reklam gösterilemedi. Tekrar deneyin.')),
         );
         return;
       }
@@ -226,7 +248,8 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       });
       _tickCountdown();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Hızlandırıldı: Sonuç ~5 dk içinde hazır.')),
+        const SnackBar(
+            content: Text('Hızlandırıldı: Sonuç ~5 dk içinde hazır.')),
       );
     } finally {
       if (mounted) setState(() => _speedingUp = false);
@@ -242,8 +265,12 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       _remainingSeconds = rem;
     });
     if (left <= 0) {
-      try { _countdown?.cancel(); } catch (_) {}
-      if (_deferGenerate && (!_saved) && (text.isEmpty || _placeholderProvided)) {
+      try {
+        _countdown?.cancel();
+      } catch (_) {}
+      if (_deferGenerate &&
+          (!_saved) &&
+          (text.isEmpty || _placeholderProvided)) {
         _generateAndSave();
       }
       if (!_doneSnackShown && mounted) {
@@ -252,18 +279,27 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         final msg = loc.t('reading.countdown.done') != 'reading.countdown.done'
             ? loc.t('reading.countdown.done')
             : 'Yorumunuz gecmis kutusuna yonlendirilmistir.';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
       }
     }
   }
 
   Future<void> _generateAndSave() async {
     String locale = 'tr';
-    try { locale = Localizations.localeOf(context).languageCode; } catch (_) {}
-    var profile = context.mounted ? context.read<ProfileController>().profile : ProfileController().profile;
+    try {
+      locale = Localizations.localeOf(context).languageCode;
+    } catch (_) {}
+    var profile = context.mounted
+        ? context.read<ProfileController>().profile
+        : ProfileController().profile;
     final extras = Map<String, dynamic>.from(widget.requestExtras ?? {});
     String titleSafe;
-    try { titleSafe = titleTr(context, widget.type); } catch (_) { titleSafe = _title(widget.type); }
+    try {
+      titleSafe = titleTr(context, widget.type);
+    } catch (_) {
+      titleSafe = _title(widget.type);
+    }
 
     // If a background pending job already completed, prefer the saved history text
     // to avoid a second AI call (and permit re-consumption).
@@ -280,8 +316,15 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
             readyText = _appendTarotOutro(readyText, profile.name);
           }
           if (!mounted) return;
-          setState(() { text = readyText; _saved = true; _placeholderProvided = false; _streaming = false; });
-          try { await PendingReadingsService.cancel(pid); } catch (_) {}
+          setState(() {
+            text = readyText;
+            _saved = true;
+            _placeholderProvided = false;
+            _streaming = false;
+          });
+          try {
+            await PendingReadingsService.cancel(pid);
+          } catch (_) {}
           _pendingId = null;
           return;
         }
@@ -310,13 +353,23 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       if (!mounted) {
         // Persist in background even if page is closed
         await _persistDirectOrProvider(titleSafe, generated);
-        try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
+        try {
+          if (_pendingId != null)
+            await PendingReadingsService.cancel(_pendingId!);
+        } catch (_) {}
         _pendingId = null;
-        try { await Analytics.log('reading_completed', {'type': widget.type, 'bg': true}); } catch (_) {}
+        try {
+          await Analytics.log(
+              'reading_completed', {'type': widget.type, 'bg': true});
+        } catch (_) {}
         return;
       }
 
-      setState(() { text = generated; _streaming = false; });
+      setState(() {
+        text = generated;
+        _streaming = false;
+        _placeholderProvided = false;
+      });
       await _saveToHistory();
       if (((_remainingSeconds ?? 0) == 0) && !_doneSnackShown && mounted) {
         _doneSnackShown = true;
@@ -324,11 +377,19 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         final msg = loc.t('reading.countdown.done') != 'reading.countdown.done'
             ? loc.t('reading.countdown.done')
             : 'Yorumunuz gecmis kutusuna yonlendirilmistir.';
-        try { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))); } catch (_) {}
+        try {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(msg)));
+        } catch (_) {}
       }
-      try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
+      try {
+        if (_pendingId != null)
+          await PendingReadingsService.cancel(_pendingId!);
+      } catch (_) {}
       _pendingId = null;
-      try { await Analytics.log('reading_completed', {'type': widget.type}); } catch (_) {}
+      try {
+        await Analytics.log('reading_completed', {'type': widget.type});
+      } catch (_) {}
     } on AiGenerationGuardException catch (_) {
       // Permit missing or already consumed: do not attempt fallback generation.
       // If history has the final text it will be shown via the early-return above.
@@ -337,19 +398,32 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       final msg = l.t('error.generic') != 'error.generic'
           ? l.t('error.generic')
           : 'Bu işlem için önce erişim alınması gerekiyor.';
-      try { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))); } catch (_) {}
+      try {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      } catch (_) {}
       return;
     } catch (_) {
       final generated = _fallbackText(profile: profile, locale: locale);
       if (!mounted) {
         await _persistDirectOrProvider(titleSafe, generated);
-        try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
+        try {
+          if (_pendingId != null)
+            await PendingReadingsService.cancel(_pendingId!);
+        } catch (_) {}
         _pendingId = null;
         return;
       }
-      setState(() { text = generated; _streaming = false; });
+      setState(() {
+        text = generated;
+        _streaming = false;
+        _placeholderProvided = false;
+      });
       await _saveToHistory();
-      try { if (_pendingId != null) await PendingReadingsService.cancel(_pendingId!); } catch (_) {}
+      try {
+        if (_pendingId != null)
+          await PendingReadingsService.cancel(_pendingId!);
+      } catch (_) {}
       _pendingId = null;
       return;
     }
@@ -370,6 +444,15 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     // Coffee already includes a strict outro; avoid duplicating.
     if (widget.type == 'coffee') return false;
     return true;
+  }
+
+  bool get _isPreparingState => text.isEmpty || _placeholderProvided;
+
+  String _preparingDescription(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final message = loc.t('reading.preparing.detail');
+    if (message != 'reading.preparing.detail') return message;
+    return 'Yorumunuz hazırlanıyor, lütfen bekleyin...';
   }
 
   String _reengagementCtaText() {
@@ -406,8 +489,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
 
   String _appendTarotOutro(String base, String name) {
     final who = name.trim().isEmpty ? '' : (name.trim() + ', ');
-    const outro =
-        'kartlardaki semboller, tematik bir bakisla yorumlanabilir.\n'
+    const outro = 'kartlardaki semboller, tematik bir bakisla yorumlanabilir.\n'
         'Bu yorum eglence amaclidir; kendi sezgini de referans al.';
     final header = who.isEmpty ? '' : who;
     final add = header + outro;
@@ -418,7 +500,8 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
 
   Future<void> _persistDirectOrProvider(String title, String generated) async {
     try {
-      final usedId = _pendingId ?? DateTime.now().millisecondsSinceEpoch.toString();
+      final usedId =
+          _pendingId ?? DateTime.now().millisecondsSinceEpoch.toString();
       final entry = HistoryEntry(
         id: usedId,
         type: widget.type,
@@ -428,7 +511,11 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       );
       try {
         final hcEarly = context.read<HistoryController>();
-        try { await hcEarly.upsert(entry); } catch (_) { await _saveHistoryDirect(entry); }
+        try {
+          await hcEarly.upsert(entry);
+        } catch (_) {
+          await _saveHistoryDirect(entry);
+        }
       } catch (_) {
         await _saveHistoryDirect(entry);
       }
@@ -445,7 +532,10 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
       for (var i = 0; i < list.length; i++) {
         try {
           final m = json.decode(list[i]) as Map<String, dynamic>;
-          if ((m['id'] as String?) == e.id) { idx = i; break; }
+          if ((m['id'] as String?) == e.id) {
+            idx = i;
+            break;
+          }
         } catch (_) {}
       }
       final enc = json.encode(e.toJson());
@@ -461,7 +551,8 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
   Future<void> _saveToHistory() async {
     if (_saved) return;
     final hc = context.read<HistoryController>();
-    final usedId = _pendingId ?? DateTime.now().millisecondsSinceEpoch.toString();
+    final usedId =
+        _pendingId ?? DateTime.now().millisecondsSinceEpoch.toString();
     final entry = HistoryEntry(
       id: usedId,
       type: widget.type,
@@ -483,12 +574,20 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     final loc = AppLocalizations.of(context);
     final hc = context.watch<HistoryController>();
     final entryId = _entryId(hc);
+    final isPreparing = _isPreparingState;
     final fav = entryId == null
         ? false
-        : hc.items.firstWhere(
-            (e) => e.id == entryId,
-            orElse: () => HistoryEntry(id: '', type: '', title: '', text: '', createdAt: DateTime.now()),
-          ).favorite;
+        : hc.items
+            .firstWhere(
+              (e) => e.id == entryId,
+              orElse: () => HistoryEntry(
+                  id: '',
+                  type: '',
+                  title: '',
+                  text: '',
+                  createdAt: DateTime.now()),
+            )
+            .favorite;
 
     // Optional tarot cards row (front faces)
     final List<int>? cardIdxs = (widget.requestExtras?['cardIndices'] is List)
@@ -518,13 +617,13 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
           IconButton(
             tooltip: AppLocalizations.of(context).t('action.copy'),
             icon: const Icon(Icons.copy),
-            onPressed: text.isEmpty
+            onPressed: isPreparing
                 ? null
                 : () async {
                     await Clipboard.setData(ClipboardData(text: text));
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(loc.t('action.copied'))));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(loc.t('action.copied'))));
                     }
                   },
           ),
@@ -537,126 +636,133 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(titleTr(context, widget.type), style: Theme.of(context).textTheme.titleLarge),
-            if (widget.type == 'tarot' && cardIdxs != null && cardIdxs.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _TarotFrontRow(indices: cardIdxs.take(3).toList()),
-            ],
-            if ((_remainingSeconds ?? 0) > 0) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  _EtaBadge(seconds: _remainingSeconds!),
-                  const SizedBox(width: 8),
-                ],
-              ),
-            ],
-            // Coffee sonucu hazir olana kadar bilgilendirici metin
-            if (widget.type == 'coffee' && text.isEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                AppLocalizations.of(context).t('coffee.waiting') != 'coffee.waiting'
-                    ? AppLocalizations.of(context).t('coffee.waiting')
-                    : 'Kahve yorumunuz hazırlanıyor, lütfen bekleyiniz...',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ],
-            // Palm sonucu hazir olana kadar bilgilendirici metin
-            if (widget.type == 'palm' && text.isEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                AppLocalizations.of(context).t('palm.waiting') != 'palm.waiting'
-                    ? AppLocalizations.of(context).t('palm.waiting')
-                    : 'El çizgisi yorumunuz hazırlanıyor, lütfen bekleyin...',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ],
-            // Tarot sonucu hazir olana kadar bilgilendirici metin
-            if (widget.type == 'tarot' && text.isEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                AppLocalizations.of(context).t('tarot.waiting') != 'tarot.waiting'
-                    ? AppLocalizations.of(context).t('tarot.waiting')
-                    : 'Tarot yorumunuz hazırlanıyor, lütfen bekleyin...',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ],
-            // Astro sonucu hazir olana kadar bilgilendirici metin
-            if (widget.type == 'astro' && text.isEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                AppLocalizations.of(context).t('astro.waiting') != 'astro.waiting'
-                    ? AppLocalizations.of(context).t('astro.waiting')
-                    : 'Günlük burç yorumunuz hazırlanıyor, lütfen bekleyiniz...',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Expanded(
-              child: text.isEmpty
-                  ? const _ShimmerParagraph()
-                  : SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SelectableText(text),
-                          if (_shouldShowReengagementCta(text)) ...[
-                            const SizedBox(height: 16),
-                            Text(
-                              _reengagementCtaText(),
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-            ),
-            const SizedBox(height: 8),
-            if (text.isEmpty &&
-                (_remainingSeconds ?? 0) > _speedupTargetEta.inSeconds &&
-                _pendingId != null &&
-                !_speedupUsed) ...[
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _speedingUp ? null : _speedUpToFiveMinutes,
-                  icon: _speedingUp
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.rocket_launch, size: 18),
-                  label: const Text('Reklam izle • 5 dk’ya hızlandır'),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            Row(
-              children: [
-                ElevatedButton(
-                  onPressed: text.isEmpty ? null : () => Share.share(text, subject: titleTr(context, widget.type)),
-                  child: Text(loc.t('action.share')),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  child: Text(loc.t('action.close')),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(titleTr(context, widget.type),
+                  style: Theme.of(context).textTheme.titleLarge),
+              if (widget.type == 'tarot' &&
+                  cardIdxs != null &&
+                  cardIdxs.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _TarotFrontRow(indices: cardIdxs.take(3).toList()),
+              ],
+              if ((_remainingSeconds ?? 0) > 0) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _EtaBadge(seconds: _remainingSeconds!),
+                    const SizedBox(width: 8),
+                  ],
                 ),
               ],
-            ),
-            if (widget.type == 'coffee') ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Bu içerik eğlence amaçlıdır. Kesinlik içermez.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70, fontSize: 12),
+              if (isPreparing) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white10,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2.2),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            loc.t('reading.preparing') != 'reading.preparing'
+                                ? loc.t('reading.preparing')
+                                : 'Hazırlanıyor...',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _preparingDescription(context),
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Expanded(
+                child: isPreparing
+                    ? const _ShimmerParagraph()
+                    : SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SelectableText(text),
+                            if (_shouldShowReengagementCta(text)) ...[
+                              const SizedBox(height: 16),
+                              Text(
+                                _reengagementCtaText(),
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
               ),
+              const SizedBox(height: 8),
+              if (isPreparing &&
+                  (_remainingSeconds ?? 0) > _speedupTargetEta.inSeconds &&
+                  _pendingId != null &&
+                  !_speedupUsed) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _speedingUp ? null : _speedUpToFiveMinutes,
+                    icon: _speedingUp
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.rocket_launch, size: 18),
+                    label: const Text('Reklam izle • 5 dk’ya hızlandır'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: isPreparing
+                        ? null
+                        : () => Share.share(text,
+                            subject: titleTr(context, widget.type)),
+                    child: Text(loc.t('action.share')),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: Text(loc.t('action.close')),
+                  ),
+                ],
+              ),
+              if (widget.type == 'coffee') ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Bu içerik eğlence amaçlıdır. Kesinlik içermez.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
             ],
-          ],
-        ),
+          ),
         ),
       ),
     );
@@ -673,7 +779,8 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
 
   String? _entryId(HistoryController hc) {
     try {
-      final e = hc.items.firstWhere((e) => e.text == text && e.type == widget.type);
+      final e =
+          hc.items.firstWhere((e) => e.text == text && e.type == widget.type);
       return e.id;
     } catch (_) {
       return null;
@@ -685,29 +792,44 @@ bool _looksLikePlaceholder(String t) {
   final s = t.toLowerCase().trim();
   if (s.isEmpty) return true;
   if (s.length < 24) return true;
-  return s.contains('hazir') || s.contains('hazır') || s.contains('prepar') || s.contains('loading');
+  return s.contains('hazir') ||
+      s.contains('hazır') ||
+      s.contains('prepar') ||
+      s.contains('loading');
 }
 
 String _title(String t) {
   switch (t) {
-    case 'coffee': return 'Kahve Yorumu';
-    case 'tarot': return 'Tarot';
-    case 'palm': return 'El Çizgisi Yorumu';
-    case 'dream': return 'Rüya Tabiri';
-    case 'astro': return 'Astroloji';
-    default: return 'MystiQ';
+    case 'coffee':
+      return 'Kahve Yorumu';
+    case 'tarot':
+      return 'Tarot';
+    case 'palm':
+      return 'El Çizgisi Yorumu';
+    case 'dream':
+      return 'Rüya Tabiri';
+    case 'astro':
+      return 'Astroloji';
+    default:
+      return 'MystiQ';
   }
 }
 
 String titleTr(BuildContext context, String t) {
   final loc = AppLocalizations.of(context);
   switch (t) {
-    case 'coffee': return loc.t('coffee.title');
-    case 'tarot': return loc.t('tarot.title');
-    case 'palm': return loc.t('palm.title');
-    case 'dream': return loc.t('dream.title');
-    case 'astro': return loc.t('astro.title');
-    default: return loc.t('app.name');
+    case 'coffee':
+      return loc.t('coffee.title');
+    case 'tarot':
+      return loc.t('tarot.title');
+    case 'palm':
+      return loc.t('palm.title');
+    case 'dream':
+      return loc.t('dream.title');
+    case 'astro':
+      return loc.t('astro.title');
+    default:
+      return loc.t('app.name');
   }
 }
 
@@ -720,9 +842,9 @@ class _ShimmerParagraph extends StatefulWidget {
 
 class _ShimmerParagraphState extends State<_ShimmerParagraph>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
-        ..repeat(reverse: true);
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1100))
+    ..repeat(reverse: true);
   @override
   void dispose() {
     _c.dispose();
@@ -731,29 +853,27 @@ class _ShimmerParagraphState extends State<_ShimmerParagraph>
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 6.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: List.generate(6, (i) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: FadeTransition(
-                opacity: Tween(begin: 0.45, end: 1.0)
-                    .animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
-                child: Container(
-                  height: 12,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white10,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 6.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(6, (i) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: FadeTransition(
+              opacity: Tween(begin: 0.45, end: 1.0).animate(
+                  CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+              child: Container(
+                height: 12,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(6),
                 ),
               ),
-            );
-          }),
-        ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -786,7 +906,8 @@ class _EtaBadge extends StatelessWidget {
 }
 
 // Test helper retained for existing tests
-String ensureMinLengthForTest(BuildContext ctx, String type, String base) => _ensureMinLength(ctx, base);
+String ensureMinLengthForTest(BuildContext ctx, String type, String base) =>
+    _ensureMinLength(ctx, base);
 
 String _ensureMinLength(BuildContext ctx, String base) {
   final t = base.trim();
@@ -827,7 +948,7 @@ class _TarotFrontRow extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(radius),
               child: AspectRatio(
-                aspectRatio: 72/112,
+                aspectRatio: 72 / 112,
                 child: SharpAssetFallback(
                   TarotDeck.frontAsset(idx),
                   fit: BoxFit.cover,
