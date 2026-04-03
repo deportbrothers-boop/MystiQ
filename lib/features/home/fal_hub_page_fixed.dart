@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../core/entitlements/entitlements_controller.dart';
 import '../../core/i18n/app_localizations.dart';
 import '../../common/widgets/sharp_image.dart';
+import '../../theme/app_theme.dart';
 
 class ReadingHubPage extends StatefulWidget {
   const ReadingHubPage({super.key});
@@ -62,7 +64,20 @@ class _ReadingHubPageState extends State<ReadingHubPage> {
     final premium = context.watch<EntitlementsController>().isPremium;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: Text(loc.t('app.name')), actions: [
+      appBar: AppBar(title: Text(
+        loc.t('app.name'),
+        style: GoogleFonts.greatVibes(
+          fontSize: 40,
+          color: AppTheme.goldBright,
+          shadows: const [
+            Shadow(
+              color: Colors.black54,
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+      ), actions: [
         if (!premium)
           Padding(
             padding: const EdgeInsets.only(right: 8.0, top: 8.0, bottom: 8.0),

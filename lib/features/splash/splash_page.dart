@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
-import '../../common/widgets/sharp_image.dart';
 import 'package:go_router/go_router.dart';
 
 class SplashPage extends StatefulWidget {
@@ -123,7 +122,11 @@ class _SplashPageState extends State<SplashPage> {
             alignment: Alignment(0, -0.1),
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 24.0),
-              child: SharpAssetFallback('assets/splash/brand.png', fit: BoxFit.contain),
+              child: Image(
+                image: AssetImage('assets/icon/app_icon.png'),
+                width: 280,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
           const Center(child: _Stars()),

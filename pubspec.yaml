@@ -31,6 +31,7 @@ dependencies:
   share_plus: ^10.0.2
   flutter_local_notifications: ^17.2.1+2
   timezone: ^0.9.2
+  google_fonts: ^8.0.2
 
 dev_dependencies:
   flutter_test:
@@ -67,7 +68,11 @@ flutter_launcher_icons:
 
 # Native splash screen configuration (Android + iOS)
 flutter_native_splash:
-  # Native splash ekranlarını kapatıyoruz; Flutter içinden SplashPage kullanılıyor.
-  android: false
-  ios: false
+  color: "#0D0D2B"
+  image: assets/icon/app_icon.png
+  android: true
+  ios: true
   web: false
+  android_12:
+    color: "#0D0D2B"
+    image: assets/icon/app_icon.png
