@@ -1,4 +1,4 @@
-MystiQ AI Proxy
+Falla AI Proxy
 ================
 
 Small Node proxy to keep your OpenAI API key off-device. Provides:

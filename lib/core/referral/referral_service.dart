@@ -43,8 +43,8 @@ class ReferralService {
 
   static Future<void> shareMyCode(BuildContext context) async {
     final code = await myCode();
-    final msg = 'MystiQ referans kodum: $code\nKullan, 1 yorum hakki kazan!';
-    await Share.share(msg, subject: 'MystiQ Referans Kodu');
+    final msg = 'Falla referans kodum: $code\nKullan, 1 yorum hakki kazan!';
+    await Share.share(msg, subject: 'Falla Referans Kodu');
   }
 
   // Promo: single-use per user, always grants 1 reading (100 coins)

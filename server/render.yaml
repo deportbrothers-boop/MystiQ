@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: mystiq-ai
+    name: falla-ai
     env: node
     rootDir: .
     buildCommand: npm install

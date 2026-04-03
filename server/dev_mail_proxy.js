@@ -4,7 +4,7 @@
 //   set SMTP_PORT=587
 //   set SMTP_USER=user@example.com
 //   set SMTP_PASS=app_password
-//   set FROM_EMAIL=noreply@mystiq.app
+//   set FROM_EMAIL=noreply@falla.app
 //   node server/dev_mail_proxy.js
 // Notes:
 //   - 587 -> secure:false (STARTTLS), 465 -> secure:true
@@ -57,11 +57,11 @@ const server = http.createServer(async (req, res) => {
       const to = j.email;
       const code = j.code;
       if (!to || !code) return sendJson(res, 400, { ok: false, error: 'email and code required' });
-      const from = process.env.FROM_EMAIL || 'noreply@mystiq.app';
+      const from = process.env.FROM_EMAIL || 'noreply@falla.app';
       const info = await transporter.sendMail({
         from,
         to,
-        subject: 'MystiQ Doğrulama Kodu',
+        subject: 'Falla Doğrulama Kodu',
         text: `Giriş doğrulama kodunuz: ${code}\nKod 10 dakika geçerlidir.`,
         html: `<p>Giriş doğrulama kodunuz:</p><h2>${code}</h2><p>Kod 10 dakika geçerlidir.</p>`,
       });

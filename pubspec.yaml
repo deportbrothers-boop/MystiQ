@@ -1,5 +1,5 @@
-name: mystiq
-description: MystiQ - Kahve yorumu uygulaması (Flutter)
+name: falla
+description: Falla - Kahve yorumu uygulaması (Flutter)
 publish_to: 'none'
 
 environment:
@@ -45,8 +45,6 @@ flutter:
     - assets/images/
     - assets/images/bg/
     - assets/images/categories/
-    - assets/images/categories/2.0x/
-    - assets/images/categories/3.0x/
     - assets/images/coffee/
     - assets/images/tarot/
     - assets/images/tarot/fronts/
@@ -65,7 +63,7 @@ flutter_launcher_icons:
   min_sdk_android: 21
   remove_alpha_ios: true
   # Android adaptive icon (enabled)
-  adaptive_icon_background: "#0F0D15"   # MystiQ koyu arka plan
+  adaptive_icon_background: "#0F0D15"   # Falla koyu arka plan
   adaptive_icon_foreground: assets/icons/mystiq_icon.jpg
 
 # Native splash screen configuration (Android + iOS)

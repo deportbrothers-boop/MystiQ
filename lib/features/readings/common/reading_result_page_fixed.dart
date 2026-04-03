@@ -499,44 +499,44 @@ String _appendPersonalOutro(String type, String locale, String name, String base
         'Ama enerjin hala evrenle konusuyor.\n'
         'Kaderin bir sonraki mesaji icin yeniden bir kahve pisir, niyetini dile ve fincanini hazirla.\n\n'
         'Unutma, her fincan bir anahtar...\n'
-        'Ve bir sonraki kapiyi sadece MystiQ\'te acabilirsin.';
+        'Ve bir sonraki kapiyi sadece Falla\'da acabilirsin.';
     final en = '($who), as the cup grows quiet, its secrets settle...\n'
         'Yet your energy still speaks to the universe.\n'
         'For the next message of fate, brew another coffee, set your intention, and prepare your cup.\n\n'
         'Remember, every cup is a key...\n'
-        'And the next door opens only on MystiQ.';
+        'And the next door opens only on Falla.';
     final add = (locale=='tr')?tr:en;
     return base.contains(add.trim()) ? base : (base.trim() + '\n\n' + add);
   }
   if (type == 'tarot') {
     final tr = '($who), acilimin sonunda bir cumlelik niyetini hatirla;\n'
-        'yol haritasi kucuk ama net bir adimi isaret ediyor.\n\nKartlarin kapisi MystiQ\'te.';
+        'yol haritasi kucuk ama net bir adimi isaret ediyor.\n\nKartlarin kapisi Falla\'da.';
     final en = '($who), at the close of the spread, recall your one-line intention;\n'
-        'the roadmap points to one small, clear step.\n\nThe door of the cards is on MystiQ.';
+        'the roadmap points to one small, clear step.\n\nThe door of the cards is on Falla.';
     final add = (locale=='tr')?tr:en;
     return base.contains(add.trim()) ? base : (base.trim() + '\n\n' + add);
   }
   if (type == 'dream') {
     final tr = '($who), ruyanin izini gun icinde iki kez daha fark et;\n'
-        'kucuk bir niyetle gune devam et.\n\nBir sonraki sembolu MystiQ\'te yorumlayalim.';
+        'kucuk bir niyetle gune devam et.\n\nBir sonraki sembolu Falla\'da yorumlayalim.';
     final en = '($who), notice your dream\'s symbol twice today;\n'
-        'continue with a small intention.\n\nLet\'s read the next sign on MystiQ.';
+        'continue with a small intention.\n\nLet\'s read the next sign on Falla.';
     final add = (locale=='tr')?tr:en;
     return base.contains(add.trim()) ? base : (base.trim() + '\n\n' + add);
   }
   if (type == 'palm') {
     final tr = '($who), avucun bugun nazik netlikte konustu;\n'
-        'tek bir adimi sec ve ilerle.\n\nBir sonraki yorumu MystiQ\'te ac.';
+        'tek bir adimi sec ve ilerle.\n\nBir sonraki yorumu Falla\'da ac.';
     final en = '($who), your palm spoke with gentle clarity;\n'
-        'choose one step and move.\n\nOpen the next reading on MystiQ.';
+        'choose one step and move.\n\nOpen the next reading on Falla.';
     final add = (locale=='tr')?tr:en;
     return base.contains(add.trim()) ? base : (base.trim() + '\n\n' + add);
   }
   if (type == 'astro') {
     final tr = '($who), bugun yildizlarin fýsýltýsýný bir cumlelik niyetle tamamla;\n'
-        'kucuk ama net adimlar acilir.\n\nGunun sonrasi icin MystiQ\'e bekleriz.';
+        'kucuk ama net adimlar acilir.\n\nGunun sonrasi icin Falla\'ya bekleriz.';
     final en = '($who), close today\'s stars with one-line intention;\n'
-        'small, clear steps open.\n\nSee you on MystiQ for the next one.';
+        'small, clear steps open.\n\nSee you on Falla for the next one.';
     final add = (locale=='tr')?tr:en;
     return base.contains(add.trim()) ? base : (base.trim() + '\n\n' + add);
   }
@@ -650,7 +650,7 @@ String _title(String t) {
     case 'palm': return 'Palm';
     case 'dream': return 'Dream';
     case 'astro': return 'Astro';
-    default: return 'MystiQ';
+    default: return 'Falla';
   }
 }
 

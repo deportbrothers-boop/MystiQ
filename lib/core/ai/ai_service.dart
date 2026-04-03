@@ -1014,7 +1014,7 @@ class AiService {
       'dayOfYear':
           int.parse('${now.difference(DateTime(now.year)).inDays + 1}'),
       'locale': locale,
-      'app': 'MystiQ',
+      'app': 'Falla',
     };
   }
 }

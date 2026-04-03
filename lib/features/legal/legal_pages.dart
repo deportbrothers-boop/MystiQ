@@ -33,19 +33,19 @@ class _DocPage extends StatelessWidget {
 }
 
 const _terms =
-    'MystiQ, eğlence amaçlıdır ve sağlık/finansal tavsiye içermez. '
+    'Falla, eğlence amaçlıdır ve sağlık/finansal tavsiye içermez. '
     'Uygulamayı kullanarak yerel yasalara uymayı kabul edersiniz. '
     'Bu uygulamada ücretli satın alım yoktur; coin yalnızca reklam izleyerek kazanılır.';
 
 const _privacy = '''
-MystiQ - Gizlilik Politikası
+Falla - Gizlilik Politikası
 
 Yürürlük Tarihi: 11 Kasım 2025
 Geliştirici / Yayıncı: GG STUDIOS
-Uygulama Adı: MystiQ
+Uygulama Adı: Falla
 
 1) Genel Bilgilendirme
-MystiQ, kullanıcılara eğlence amaçlı kahve kupasındaki şekillerin sembolik yorumunu sunar. Gelecek tahmini yapılmaz, kesinlik veya garanti içermez. Bu gizlilik politikası; hangi verilerin toplandığını, nasıl kullanıldığını, nasıl korunduğunu ve kullanıcı haklarını açıklar. Uygulamayı kullanarak bu politikayı kabul etmiş olursunuz.
+Falla, kullanıcılara eğlence amaçlı kahve kupasındaki şekillerin sembolik yorumunu sunar. Gelecek tahmini yapılmaz, kesinlik veya garanti içermez. Bu gizlilik politikası; hangi verilerin toplandığını, nasıl kullanıldığını, nasıl korunduğunu ve kullanıcı haklarını açıklar. Uygulamayı kullanarak bu politikayı kabul etmiş olursunuz.
 
 2) Toplanan Bilgiler
 a) Otomatik Toplanan Bilgiler
@@ -69,7 +69,7 @@ c) Üçüncü Taraf Servisler
 - Uygulama performansını izlemek ve hataları düzeltmek
 - Reklam süreçlerini ve içerik deneyimini yönetmek
 - Yasal yükümlülükleri yerine getirmek
-MystiQ kullanıcı verilerini satmaz, kiralamaz ve izinsiz üçüncü şahıslarla paylaşmaz.
+Falla kullanıcı verilerini satmaz, kiralamaz ve izinsiz üçüncü şahıslarla paylaşmaz.
 
 4) Veri Saklama Süresi
 - Kullanıcı tarafından yüklenen görseller, işlendiğinde en geç 24 saat içinde silinebilir.
@@ -80,7 +80,7 @@ MystiQ kullanıcı verilerini satmaz, kiralamaz ve izinsiz üçüncü şahıslar
 Uygulama kendi çerezlerini tutmaz; ancak Google/AdMob gibi üçüncü taraf servisler deneyimi geliştirmek için çerez veya benzeri teknolojiler kullanabilir.
 
 6) Üçüncü Taraf Bağlantıları
-Uygulama, üçüncü taraf site/uygulamalara bağlantılar içerebilir. Bu hizmetlerin içerik ve gizlilik uygulamalarından MystiQ sorumlu değildir.
+Uygulama, üçüncü taraf site/uygulamalara bağlantılar içerebilir. Bu hizmetlerin içerik ve gizlilik uygulamalarından Falla sorumlu değildir.
 
 7) Çocukların Gizliliği
 Uygulama 13 yaş altı için tasarlanmamıştır. Bu yaş grubuna ait veriler yanlışlıkla toplanırsa derhal silinir.

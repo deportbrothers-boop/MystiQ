@@ -19,7 +19,7 @@ import '../../../core/readings/pending_readings_service_fixed.dart';
 import '../../../core/readings/reading_timing.dart';
 import '../../history/history_controller.dart';
 import '../../history/history_entry.dart';
-import 'package:mystiq/features/readings/coffee/_thumb_slot.dart';
+import 'package:falla/features/readings/coffee/_thumb_slot.dart';
 
 class CoffeePage extends StatefulWidget {
   const CoffeePage({super.key});

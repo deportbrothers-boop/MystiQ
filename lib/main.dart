@@ -90,7 +90,7 @@ Future<void> main() async {
       entitlements.addCoins(grantVal);
     }
 
-    runApp(MystiQApp(
+    runApp(FallaApp(
       entitlements: entitlements,
       history: history,
       locale: locale,
@@ -102,13 +102,13 @@ Future<void> main() async {
   });
 }
 
-class MystiQApp extends StatelessWidget {
+class FallaApp extends StatelessWidget {
   final EntitlementsController entitlements;
   final HistoryController history;
   final LocaleController locale;
   final RewardsController rewards;
   final ProfileController profile;
-  const MystiQApp({super.key, required this.entitlements, required this.history, required this.locale, required this.rewards, required this.profile});
+  const FallaApp({super.key, required this.entitlements, required this.history, required this.locale, required this.rewards, required this.profile});
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +124,7 @@ class MystiQApp extends StatelessWidget {
       ],
       child: Consumer<LocaleController>(
         builder: (context, lc, _) => MaterialApp.router(
-          title: 'MystiQ',
+          title: 'Falla',
           theme: AppTheme.dark,
           routerConfig: appRouter,
           debugShowCheckedModeBanner: false,

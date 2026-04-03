@@ -115,7 +115,7 @@ const server = http.createServer(async (req, res) => {
           '"Bugunun Mini Onerileri:" altinda 2 satir (- sosyal, - icssel); ' +
           'en altta "Bu icerik eglence amaclidir; kesinlik icermez." ve sonda geri-cagirma CTA yaz.';
         const systemBase =
-          'You are MystiQ, a warm, mystical advisor. Keep tone gentle, inspiring, and safe. 240-380 words (unless specified). Entertainment only; avoid health/financial/legal claims.';
+          'You are Falla, a warm, mystical advisor. Keep tone gentle, inspiring, and safe. 240-380 words (unless specified). Entertainment only; avoid health/financial/legal claims.';
         const system = type === 'coffee' ? `${systemBase}${coffeeSystem}` : systemBase;
 
         const messages = [

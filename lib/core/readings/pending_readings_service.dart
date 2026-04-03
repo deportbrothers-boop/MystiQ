@@ -39,7 +39,7 @@ class PendingReadingsService {
     await PendingI18n.ensure(locale);
     await NotificationsService.scheduleOneShot(
       id: id.hashCode & 0x7FFFFFFF,
-      title: 'MystiQ - ${PendingI18n.titleForType(type, locale)}',
+      title: 'Falla - ${PendingI18n.titleForType(type, locale)}',
       body: PendingI18n.bodyForType(type, locale),
       secondsFromNow: seconds,
     );
@@ -85,7 +85,7 @@ class PendingReadingsService {
       await NotificationsService.cancelOneShot(notifId);
       await NotificationsService.scheduleOneShot(
         id: notifId,
-        title: 'MystiQ - ${PendingI18n.titleForType(type, locale)}',
+        title: 'Falla - ${PendingI18n.titleForType(type, locale)}',
         body: PendingI18n.bodyForType(type, locale),
         secondsFromNow: seconds,
       );

@@ -78,7 +78,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         : (Localizations.localeOf(context).languageCode.startsWith('tr') ? 'AI Canli' : 'AI Live');
     final navHistory = loc.t('nav.history');
     final navProfile = loc.t('nav.profile');
-    const gold = Color(0xFFFFC857); // MystiQ altin tonu
+    const gold = Color(0xFFFFC857); // Falla altin tonu
     const unSel = Colors.white70;
     const liveDisabled = Colors.white38;
     return PopScope(

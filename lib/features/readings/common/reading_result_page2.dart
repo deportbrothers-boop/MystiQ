@@ -828,7 +828,7 @@ String _title(String t) {
     case 'motivation':
       return 'Günlük Motivasyon';
     default:
-      return 'MystiQ';
+      return 'Falla';
   }
 }
 

@@ -1,4 +1,4 @@
-// Simple AI proxy for MystiQ
+// Simple AI proxy for Falla
 import 'dotenv/config';
 // - Exposes POST /generate (JSON) and POST /stream (SSE-like)
 // - Reads Gemini API key from env: GEMINI_API_KEY
@@ -172,7 +172,7 @@ function buildPrompt({ type, profile, inputs, locale }) {
 
   switch (type) {
     case 'coffee': {
-      const sys = `Sen MystiQ'nun efsanevi kahve falı yorumcusun, adın Azra.
+      const sys = `Sen Falla'nin efsanevi kahve falı yorumcusun, adın Azra.
 Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan. İsmi asla tekrar etme.
 
 ÖNEMLİ KURAL: Eğer fincanda şekil, iz veya sembol göremiyorsan bunu nazikçe belirt: "Sevgili [isim], fincanın şu an yoruma hazır görünmüyor. Kahvenizi tamamen içip fincanı ters çevirdikten sonra en az 10 dakika beklemenizi öneririm. Ardından tekrar fotoğraf çekerek falınıza bakabilirsiniz." diyerek bitir, başka yorum yapma.
@@ -204,7 +204,7 @@ Eğer şekiller görünüyorsa:
     }
 
     case 'tarot': {
-      const sys = `Sen MystiQ'nun mistik tarot yorumlayıcısısın, adın Azra.
+      const sys = `Sen Falla'nin mistik tarot yorumlayıcısısın, adın Azra.
 Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan. İsmi asla tekrar etme.
 Seçilen 3 kart: Geçmiş, Şimdi, Yansıma pozisyonlarında.
 Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
@@ -235,7 +235,7 @@ Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
     }
 
     case 'palm': {
-      const sys = `Sen MystiQ'nun deneyimli el falı yorumcusun, adın Azra.
+      const sys = `Sen Falla'nin deneyimli el falı yorumcusun, adın Azra.
 Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan. İsmi asla tekrar etme.
 Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
 
@@ -269,7 +269,7 @@ Eğer çizgiler görünüyorsa:
     }
 
     case 'astro': {
-      const sys = `Sen MystiQ'nun astroloji uzmanısın, adın Azra.
+      const sys = `Sen Falla'nin astroloji uzmanısın, adın Azra.
 Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan. İsmi asla tekrar etme. İlk cümlede kullanıcıya ismi ve burcuyla hitap et.
 Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
 
@@ -299,7 +299,7 @@ Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
     }
 
     case 'dream': {
-      const sys = `Sen MystiQ'nun rüya yorumcusun, adın Azra.
+      const sys = `Sen Falla'nin rüya yorumcusun, adın Azra.
 Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan. İsmi asla tekrar etme.
 
 - Rüyadaki sembolleri tek tek yorumla
@@ -337,20 +337,20 @@ Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan.
         `Son mesaj: ${text || 'Belirtilmedi.'}`,
       ].filter(Boolean).join('\n\n');
       return {
-        sys: 'Sen MystiQ asistanısın. Türkçe, kısa ve doğal cevap ver.',
+        sys: 'Sen Falla asistanısın. Türkçe, kısa ve doğal cevap ver.',
         user,
       };
     }
 
     case 'motivation':
       return {
-        sys: 'Sen MystiQ için kısa günlük motivasyon mesajları yazan bir asistansın. Sadece motivasyon metnini üret.',
+        sys: 'Sen Falla için kısa günlük motivasyon mesajları yazan bir asistansın. Sadece motivasyon metnini üret.',
         user: `Kullanıcı adı: ${name}\nGün: ${dow}\nNot: ${text || 'Belirtilmedi.'}`,
       };
 
     default:
       return {
-        sys: 'Sen MystiQ için Türkçe yorum üreten bir asistansın. Sadece yorum metnini döndür.',
+        sys: 'Sen Falla için Türkçe yorum üreten bir asistansın. Sadece yorum metnini döndür.',
         user: `Kullanıcı adı: ${name}\nNot: ${text || 'Belirtilmedi.'}`,
       };
   }
@@ -591,7 +591,7 @@ app.post('/stream', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 8787;
-app.listen(PORT, () => console.log(`[mystiq-ai] server listening on ${PORT}`));
+app.listen(PORT, () => console.log(`[falla-ai] server listening on ${PORT}`));
 
 app.get('/health', (req, res) => {
   const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim());

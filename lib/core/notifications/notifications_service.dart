@@ -55,7 +55,7 @@ class NotificationsService {
       final next = _nextInstanceOf(time);
       await _plugin.zonedSchedule(
         1001,
-        'MystiQ',
+        'Falla',
         'Bugün kendin için küçük bir an ayır: Kahve Yorumu seni bekliyor.',
         next,
         details,
@@ -80,7 +80,7 @@ class NotificationsService {
 
     await scheduleOneShot(
       id: _inactivityNotifId,
-      title: 'MystiQ',
+      title: 'Falla',
       body: 'Sadece senin için açılan bir yorum var.',
       secondsFromNow: after.inSeconds.clamp(60, 7 * 24 * 3600),
     );
