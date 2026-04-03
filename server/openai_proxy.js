@@ -597,3 +597,8 @@ app.get('/health', (req, res) => {
   const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim());
   res.json({ ok: true, provider: 'gemini', model: GEMINI_MODEL, hasApiKey: hasKey });
 });
+
+setInterval(() => {
+  fetch('https://mystiq-pdxf.onrender.com/health')
+    .catch(() => {});
+}, 14 * 60 * 1000);
