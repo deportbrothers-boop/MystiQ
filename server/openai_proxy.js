@@ -153,7 +153,51 @@ function resolveInputs(inputs, body) {
   };
 }
 
+const READING_RESPONSE_CONFIG = Object.freeze({
+  coffee: {
+    maxOutputTokens: 743,
+    wordLimit: 'Yanıtın 500 ile 550 kelime arasında olsun, ne fazla ne az.',
+  },
+  tarot: {
+    maxOutputTokens: 641,
+    wordLimit: 'Yanıtın 450 ile 500 kelime arasında olsun, ne fazla ne az.',
+  },
+  palm: {
+    maxOutputTokens: 574,
+    wordLimit: 'Yanıtın 400 ile 450 kelime arasında olsun, ne fazla ne az.',
+  },
+  astro: {
+    maxOutputTokens: 506,
+    wordLimit: 'Yanıtın 350 ile 400 kelime arasında olsun, ne fazla ne az.',
+  },
+  dream: {
+    maxOutputTokens: 439,
+    wordLimit: 'Yanıtın 300 ile 350 kelime arasında olsun, ne fazla ne az.',
+  },
+  motivation: {
+    maxOutputTokens: 189,
+    wordLimit: 'Yanıtın 120 ile 150 kelime arasında olsun, ne fazla ne az.',
+  },
+});
+
+function normalizeReadingType(type) {
+  const normalized = (type || '').toString().trim().toLowerCase();
+  if (normalized === 'astrology') return 'astro';
+  return normalized;
+}
+
+function getReadingResponseConfig(type) {
+  return READING_RESPONSE_CONFIG[normalizeReadingType(type)] || null;
+}
+
+function getMaxOutputTokens(type) {
+  return getReadingResponseConfig(type)?.maxOutputTokens ?? 800;
+}
+
 function buildPrompt({ type, profile, inputs, locale }) {
+  const normalizedType = normalizeReadingType(type);
+  const responseConfig = getReadingResponseConfig(normalizedType);
+  const wordLimit = responseConfig?.wordLimit || '';
   const name = pickFirstString(profile?.name, inputs?.userName) || 'danışan';
   const zodiac = pickFirstString(profile?.zodiac, inputs?.zodiac) || 'Belirtilmedi';
   const topic = normalizeTopic(inputs?.topic);
@@ -170,7 +214,7 @@ function buildPrompt({ type, profile, inputs, locale }) {
     .filter(Boolean)
     .join('\n');
 
-  switch (type) {
+  switch (normalizedType) {
     case 'coffee': {
       const sys = `Sen Falla'nin efsanevi kahve falı yorumcusun, adın Azra.
 Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan. İsmi asla tekrar etme.
@@ -185,10 +229,10 @@ Eğer şekiller görünüyorsa:
 - Kullanıcının hayatına dair somut, kişisel mesajlar ver
 - Sonu gizemli ve merak uyandırıcı bitir
 - Türkçe, samimi, sıcak ve mistik bir dille yaz
-- Minimum 300, maksimum 400 kelime
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
 - Koçluk veya motivasyon dili kullanma. Sen bir falcısın, bir yaşam koçu değilsin.
-- Fincan ve tabaktaki şekilleri somut olarak tanımla ve bunların aşk/iş/para/sağlık ile bağlantısını mistik bir dille kur.`;
+- Fincan ve tabaktaki şekilleri somut olarak tanımla ve bunların aşk/iş/para/sağlık ile bağlantısını mistik bir dille kur.
+${wordLimit}`;
 
       const user = [
         'Kahve falı bağlamı:',
@@ -215,11 +259,11 @@ Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
 - Kullanıcıya somut bir mesaj ve öneri ver
 - Sonu umut verici ama gizemli bitir
 - Türkçe, derin ve etkileyici yaz
-- Minimum 300, maksimum 400 kelime
 - İsmi sadece bir kez kullan.
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
 - Falcı dili kullan, koçluk dili değil.
-- Somut kart sembolleri ve mistik yorumlar kullan.`;
+- Somut kart sembolleri ve mistik yorumlar kullan.
+${wordLimit}`;
 
       const user = [
         'Tarot bağlamı:',
@@ -249,11 +293,11 @@ Eğer çizgiler görünüyorsa:
 - Elde gördüğün özel işaretleri belirt
 - Somut ve kişisel mesajlar ver
 - Türkçe, mistik ve samimi yaz
-- Minimum 300, maksimum 400 kelime
 - İsmi sadece bir kez kullan.
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
 - Falcı dili kullan, koçluk dili değil.
-- Somut çizgiler, işaretler ve mistik yorumlar kullan.`;
+- Somut çizgiler, işaretler ve mistik yorumlar kullan.
+${wordLimit}`;
 
       const user = [
         'El falı bağlamı:',
@@ -279,11 +323,11 @@ Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
 - Somut öneriler ve dikkat edilmesi gerekenler yaz
 - Şanslı gün, renk veya sayı ekle
 - Türkçe, bilgili ve mistik yaz
-- Minimum 300, maksimum 400 kelime
 - İsmi sadece bir kez kullan.
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
 - Falcı dili kullan, koçluk dili değil.
-- Somut gezegen etkileri, burç sembolleri ve mistik yorumlar kullan.`;
+- Somut gezegen etkileri, burç sembolleri ve mistik yorumlar kullan.
+${wordLimit}`;
 
       const user = [
         'Astroloji bağlamı:',
@@ -308,11 +352,11 @@ Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan.
 - Kullanıcıya bu rüyadan çıkarması gereken mesajı ver
 - Sonu olumlu ve yönlendirici bitir
 - Türkçe, derin ve içten yaz
-- Minimum 300, maksimum 400 kelime
 - İsmi sadece bir kez kullan.
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
 - Falcı dili kullan, koçluk dili değil.
-- Somut rüya sembolleri ve mistik yorumlar kullan.`;
+- Somut rüya sembolleri ve mistik yorumlar kullan.
+${wordLimit}`;
 
       const user = [
         'Rüya bağlamı:',
@@ -344,7 +388,8 @@ Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan.
 
     case 'motivation':
       return {
-        sys: 'Sen Falla için kısa günlük motivasyon mesajları yazan bir asistansın. Sadece motivasyon metnini üret.',
+        sys: `Sen Falla için kısa günlük motivasyon mesajları yazan bir asistansın. Sadece motivasyon metnini üret.
+${wordLimit}`,
         user: `Kullanıcı adı: ${name}\nGün: ${dow}\nNot: ${text || 'Belirtilmedi.'}`,
       };
 
@@ -437,7 +482,7 @@ function buildPromptLengthSummary() {
         systemChars: sys.length,
         userChars: user.length,
         totalChars: sys.length + user.length,
-        maxOutputTokens: 800,
+        maxOutputTokens: getMaxOutputTokens(type),
         sampleInputChars: sampleInputCharCount(sample.profile, sample.inputs),
         imageCount: sampleImageCount(sample.inputs),
         acceptsImages: sampleImageCount(sample.inputs) > 0,
@@ -540,8 +585,9 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
 
   const mergedProfile = resolveProfile(profile, body);
   const mergedInputs = resolveInputs(inputs, body);
+  const normalizedType = normalizeReadingType(type);
   const { sys, user } = buildPrompt({
-    type,
+    type: normalizedType,
     profile: mergedProfile,
     inputs: mergedInputs,
     locale,
@@ -549,7 +595,7 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
 
   const temp = (typeof body?.temperature === 'number')
     ? body.temperature
-    : ((type === 'dream') ? 0.3 : 0.85);
+    : ((normalizedType === 'dream') ? 0.3 : 0.85);
 
   const payload = {
     systemInstruction: {
@@ -563,7 +609,7 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
     ],
     generationConfig: {
       temperature: temp,
-      maxOutputTokens: 800,
+      maxOutputTokens: getMaxOutputTokens(normalizedType),
     },
   };
 

@@ -161,22 +161,6 @@ class _AstroPageState extends State<AstroPage> {
               Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _busy ? null : () => _startAstro(viaAd: true),
-                      icon: const Icon(Icons.play_circle_outline, size: 18),
-                      label: Builder(
-                        builder: (ctx) {
-                          final t = AppLocalizations.of(ctx)
-                              .t('astro.entry.watch_and_read');
-                          return Text(t != 'astro.entry.watch_and_read'
-                              ? t
-                              : '2 Reklam izle, Yorum Al');
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _busy ? null : () => _startAstro(viaAd: false),
                       icon:

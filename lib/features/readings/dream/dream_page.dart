@@ -172,16 +172,6 @@ class _DreamPageState extends State<DreamPage> {
               ),
             ),
             const SizedBox(height: 10),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async => _startDream(viaAd: true),
-                icon: const Icon(Icons.play_circle_outline, size: 18),
-                label: const Text('2 Reklam izle, Yorum Al'),
-              ),
-            ),
-            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(

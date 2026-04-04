@@ -326,22 +326,6 @@ class _PalmPageState extends State<PalmPage> {
               child: Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: BorderSide.none,
-                        shape: const StadiumBorder(),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      icon: const Icon(Icons.play_circle_outline, size: 18),
-                      label: const Text('2 Reklam izle'),
-                      onPressed: image == null
-                          ? null
-                          : () => _startReading(forceAd: true),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: gold,

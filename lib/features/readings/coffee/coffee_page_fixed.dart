@@ -36,7 +36,6 @@ class _CoffeePageState extends State<CoffeePage>
   late final AnimationController _pulse;
   String? _scheduledId;
   Duration? _eta; // last selected ETA (10m or 5m)
-  bool _adUsed = false;
   String? _permit;
   String _topic = 'general';
   String _style = 'practical'; // 'practical' | 'spiritual' | 'analytical'
@@ -243,7 +242,6 @@ class _CoffeePageState extends State<CoffeePage>
     setState(() {
       scanning = true;
       _eta = eta;
-      _adUsed = adUsed;
     });
   }
 
@@ -443,24 +441,6 @@ class _CoffeePageState extends State<CoffeePage>
               const SizedBox(height: 10),
               Column(
                 children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.play_circle_outline, size: 18),
-                      onPressed: () async {
-                        await _startReading(viaAd: true);
-                      },
-                      label: Text(
-                        AppLocalizations.of(context)
-                                    .t('coffee.entry.watch_and_read') !=
-                                'coffee.entry.watch_and_read'
-                            ? AppLocalizations.of(context)
-                                .t('coffee.entry.watch_and_read')
-                            : '2 Reklam izle, Yorum Al',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(

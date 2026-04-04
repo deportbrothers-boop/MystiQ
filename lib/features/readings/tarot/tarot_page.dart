@@ -5,7 +5,6 @@ import '../../../core/access/access_gate.dart';
 import '../../../core/access/sku_costs.dart';
 import '../../../core/analytics/analytics.dart';
 import '../../../common/ui/responsive.dart';
-import '../../../core/ads/rewarded_helper.dart';
 import '../../../core/access/ai_generation_guard.dart';
 import '../../../common/widgets/sharp_image.dart';
 import 'package:provider/provider.dart';
@@ -88,143 +87,6 @@ class _TarotPageState extends State<TarotPage> {
             const SizedBox(height: 8),
             Row(
               children: [
-                OutlinedButton.icon(
-                  onPressed: selected.length < 3
-                      ? null
-                      : () async {
-                          await Analytics.log(
-                              'reading_started', {'type': 'tarot_ad'});
-                          const isPremium = false;
-                          if (isPremium) {
-                            final idxs = _slots.whereType<int>().toList();
-                            final names =
-                                idxs.map(TarotDeck.nameForIndex).toList();
-                            final nowMs = DateTime.now().millisecondsSinceEpoch;
-                            final reversed = List<bool>.generate(idxs.length,
-                                (k) => ((nowMs + k + idxs[k]) % 2) == 0);
-                            if (!context.mounted) return;
-                            context.push('/reading/result/tarot', extra: {
-                              'cards': names,
-                              'cardIndices': idxs,
-                              'reversed': reversed,
-                              'topic': _topic,
-                              'style': _style,
-                              // streaming/local flags removed
-                            });
-                            return;
-                          }
-                          if (!isPremium) {
-                            final remaining =
-                                await RewardedAds.remainingTodayFor('tarot',
-                                    maxPerDay: 1);
-                            if (remaining <= 0) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Bugunluk tarot reklam hakkin doldu.')),
-                              );
-                              return;
-                            }
-                          }
-                          final ok = await RewardedAds.showMultiple(
-                              context: context, count: 2, key: 'tarot');
-                          if (!context.mounted) return;
-                          if (!ok) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(
-                                AppLocalizations.of(context)
-                                            .t('tarot.fast.ad_failed') !=
-                                        'tarot.fast.ad_failed'
-                                    ? AppLocalizations.of(context)
-                                        .t('tarot.fast.ad_failed')
-                                    : 'Reklam gösterilemedi. Tekrar deneyin.',
-                              )),
-                            );
-                            return;
-                          }
-                          final permit = await AiGenerationGuard.issuePermit();
-                          final idxs = _slots.whereType<int>().toList();
-                          final names =
-                              idxs.map(TarotDeck.nameForIndex).toList();
-                          final nowMs = DateTime.now().millisecondsSinceEpoch;
-                          final reversed = List<bool>.generate(idxs.length,
-                              (k) => ((nowMs + k + idxs[k]) % 2) == 0);
-                          final eta = ReadingTiming.initialWaitFor('tarot');
-                          final readyAt = DateTime.now().add(eta);
-                          String? scheduledId;
-                          try {
-                            final extras = <String, dynamic>{
-                              'cards': names,
-                              'cardIndices': idxs,
-                              'reversed': reversed,
-                              'topic': _topic,
-                              'style': _style,
-                              'permit': permit,
-                              'adBoost': true,
-                            };
-                            final locale =
-                                Localizations.localeOf(context).languageCode;
-                            scheduledId = await PendingReadingsService.schedule(
-                              type: 'tarot',
-                              readyAt: readyAt,
-                              extras: extras,
-                              locale: locale,
-                            );
-                            try {
-                              if (scheduledId != null) {
-                                final hc = context.read<HistoryController>();
-                                await hc.upsert(HistoryEntry(
-                                  id: scheduledId,
-                                  type: 'tarot',
-                                  title: AppLocalizations.of(context)
-                                      .t('tarot.title'),
-                                  text: AppLocalizations.of(context)
-                                      .t('reading.preparing'),
-                                  createdAt: DateTime.now(),
-                                ));
-                              }
-                            } catch (_) {}
-                          } catch (_) {}
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text(
-                              AppLocalizations.of(context)
-                                          .t('tarot.fast.thanks') !=
-                                      'tarot.fast.thanks'
-                                  ? AppLocalizations.of(context)
-                                      .t('tarot.fast.thanks')
-                                  : 'Teşekkürler! Yorumun 8 dk içinde hazır.',
-                            )),
-                          );
-                          context.push('/reading/result/tarot', extra: {
-                            'cards': names,
-                            'cardIndices': idxs,
-                            'reversed': reversed,
-                            'permit': permit,
-                            'sessionId': DateTime.now().millisecondsSinceEpoch,
-                            'etaSeconds': eta.inSeconds,
-                            'readyAt': readyAt.toIso8601String(),
-                            'generateAtReady': true,
-                            if (scheduledId != null) 'pendingId': scheduledId,
-                            'topic': _topic,
-                            'style': _style,
-                            // streaming/local flags removed
-                          });
-                        },
-                  icon: const Icon(Icons.play_circle_outline, size: 18),
-                  label: Text(
-                    AppLocalizations.of(context)
-                                .t('tarot.entry.watch_and_read') !=
-                            'tarot.entry.watch_and_read'
-                        ? AppLocalizations.of(context)
-                            .t('tarot.entry.watch_and_read')
-                        : '2 Reklam izle (8 dk)',
-                  ),
-                ),
-                const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: selected.length < 3
@@ -233,25 +95,6 @@ class _TarotPageState extends State<TarotPage> {
                             await Analytics.log(
                                 'reading_started', {'type': 'tarot'});
                             final ent = context.read<EntitlementsController>();
-                            if (false) {
-                              final idxs = _slots.whereType<int>().toList();
-                              final names =
-                                  idxs.map(TarotDeck.nameForIndex).toList();
-                              final nowMs =
-                                  DateTime.now().millisecondsSinceEpoch;
-                              final reversed = List<bool>.generate(idxs.length,
-                                  (k) => ((nowMs + k + idxs[k]) % 2) == 0);
-                              if (!context.mounted) return;
-                              context.push('/reading/result/tarot', extra: {
-                                'cards': names,
-                                'cardIndices': idxs,
-                                'reversed': reversed,
-                                'topic': _topic,
-                                'style': _style,
-                                // streaming/local flags removed
-                              });
-                              return;
-                            }
                             final confirmed = await showModalBottomSheet<bool>(
                               context: context,
                               showDragHandle: true,
@@ -661,94 +504,6 @@ class _TarotPageState extends State<TarotPage> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: selected.length < 3
-                              ? null
-                              : () async {
-                                  await Analytics.log('reading_started', {'type': 'tarot_ad'});
-                                final ok = await RewardedAds.showMultiple(context: context, count: 2, key: 'tarot');
-                                if (!context.mounted) return;
-                                if (!ok) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        AppLocalizations.of(context).t('tarot.fast.ad_failed') != 'tarot.fast.ad_failed'
-                                            ? AppLocalizations.of(context).t('tarot.fast.ad_failed')
-                                            : 'Reklam gösterilemedi. Tekrar deneyin.',
-                                      ),
-                                    ),
-                                  );
-                                  return;
-                                }
-                                final permit = await AiGenerationGuard.issuePermit();
-                                final idxs = _slots.whereType<int>().toList();
-                                final names = idxs.map(TarotDeck.nameForIndex).toList();
-                                final nowMs = DateTime.now().millisecondsSinceEpoch;
-                                final reversed = List<bool>.generate(idxs.length, (k) => ((nowMs + k + idxs[k]) % 2) == 0);
-                                final eta = const Duration(minutes: 8);
-                                final readyAt = DateTime.now().add(eta);
-                                String? scheduledId;
-                                try {
-                                  final extras = <String, dynamic>{
-                                    'cards': names,
-                                    'cardIndices': idxs,
-                                    'reversed': reversed,
-                                    'topic': _topic,
-                                    'style': _style,
-                                    'permit': permit,
-                                    'adBoost': true,
-                                  };
-                                  final locale = Localizations.localeOf(context).languageCode;
-                                  scheduledId = await PendingReadingsService.schedule(
-                                    type: 'tarot',
-                                    readyAt: readyAt,
-                                    extras: extras,
-                                    locale: locale,
-                                  );
-                                  try {
-                                    final hc = context.read<HistoryController>();
-                                    await hc.upsert(HistoryEntry(
-                                      id: scheduledId!,
-                                      type: 'tarot',
-                                      title: AppLocalizations.of(context).t('tarot.title'),
-                                      text: AppLocalizations.of(context).t('reading.preparing'),
-                                      createdAt: DateTime.now(),
-                                    ));
-                                  } catch (_) {}
-                                } catch (_) {}
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      AppLocalizations.of(context).t('tarot.fast.thanks') != 'tarot.fast.thanks'
-                                          ? AppLocalizations.of(context).t('tarot.fast.thanks')
-                                          : 'Teşekkürler! Yorumun 8 dk içinde hazır.',
-                                    ),
-                                  ),
-                                );
-                                context.push('/reading/result/tarot', extra: {
-                                  'cards': names,
-                                  'cardIndices': idxs,
-                                  'reversed': reversed,
-                                  'permit': permit,
-                                  'sessionId': DateTime.now().millisecondsSinceEpoch,
-                                  'etaSeconds': eta.inSeconds,
-                                  'readyAt': readyAt.toIso8601String(),
-                                  'generateAtReady': true,
-                                  if (scheduledId != null) 'pendingId': scheduledId,
-                                  'topic': _topic,
-                                  'style': _style,
-                                  // streaming/local flags removed
-                                });
-                              },
-                        icon: const Icon(Icons.play_circle_outline, size: 18),
-                        label: Text(
-                          AppLocalizations.of(context).t('tarot.entry.watch_and_read') != 'tarot.entry.watch_and_read'
-                              ? AppLocalizations.of(context).t('tarot.entry.watch_and_read')
-                              : '2 Reklam izle (8 dk)',
-                        ),
-                      ),
-                      const SizedBox(width: 10),
                       Expanded(
                         child: ElevatedButton(
                     onPressed: selected.length < 3
