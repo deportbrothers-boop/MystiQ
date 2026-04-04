@@ -524,6 +524,12 @@ function extractGeminiText(data) {
     .trim();
 }
 
+function logResponseStats(type, text) {
+  const wordCount = text.split(' ').length;
+  const charCount = text.length;
+  console.log(`[${type}] words:${wordCount} chars:${charCount} tokens:${Math.round(charCount / 4)}`);
+}
+
 async function generateWithGemini({ type, profile, inputs, locale, body }) {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
@@ -611,6 +617,7 @@ app.post('/generate', async (req, res) => {
       body: req.body || {},
     });
     console.log('USAGE:', JSON.stringify(r.usage));
+    logResponseStats(type, r.text);
 
     /*
     // OpenAI request kept commented for future provider work.
@@ -652,6 +659,7 @@ app.post('/stream', async (req, res) => {
       body: req.body || {},
     });
     console.log('USAGE:', JSON.stringify(r.usage));
+    logResponseStats(type, r.text);
 
     /*
     // OpenAI streaming kept commented for future provider work.
