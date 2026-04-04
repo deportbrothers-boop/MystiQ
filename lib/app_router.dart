@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'features/splash/splash_page.dart';
 import 'core/i18n/app_localizations.dart';
 import 'features/onboarding/onboarding_page.dart';
 import 'features/auth/signin_page.dart';
@@ -21,15 +22,43 @@ import 'features/readings/dream/dream_page.dart';
 import 'features/profile/edit_profile_page.dart';
 import 'features/home/motivation_page.dart';
 
+Future<String> _resolveInitialLocation() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final remember = prefs.getBool('remember_me') ?? false;
+    User? user;
+    try {
+      user = FirebaseAuth.instance.currentUser;
+    } catch (_) {
+      user = null;
+    }
+
+    if (!remember && user != null) {
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+      user = null;
+    }
+
+    return (remember && user != null) ? '/home' : '/auth';
+  } catch (_) {
+    return '/auth';
+  }
+}
+
 final appRouter = GoRouter(
-  initialLocation: '/splash',
+  initialLocation: '/',
   routes: [
-    GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
+    GoRoute(
+      path: '/',
+      redirect: (_, __) async => await _resolveInitialLocation(),
+    ),
     GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
     GoRoute(path: '/auth', builder: (_, __) => const SignInPage()),
     GoRoute(path: '/auth/signup', builder: (_, __) => const SignUpPage()),
     GoRoute(path: '/home', builder: (_, __) => const HomeShell()),
-    GoRoute(path: '/live', builder: (_, __) => const HomeShell(initialIndex: 1)),
+    GoRoute(
+        path: '/live', builder: (_, __) => const HomeShell(initialIndex: 1)),
     GoRoute(path: '/paywall', builder: (_, __) => const PaywallPage()),
     GoRoute(path: '/reading/coffee', builder: (_, __) => const CoffeePage()),
     GoRoute(path: '/reading/tarot', builder: (_, __) => const TarotPage()),
@@ -39,7 +68,9 @@ final appRouter = GoRouter(
     GoRoute(path: '/motivation', builder: (_, __) => const MotivationPage()),
     GoRoute(path: '/profile/edit', builder: (_, __) => const EditProfilePage()),
     GoRoute(path: '/settings', builder: (_, __) => const SettingsPage()),
-    GoRoute(path: '/notifications', builder: (_, __) => const NotificationCenterPage()),
+    GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationCenterPage()),
     GoRoute(path: '/analytics', builder: (_, __) => const AnalyticsPage()),
     GoRoute(
       path: '/reading/result/:type',
@@ -64,4 +95,3 @@ final appRouter = GoRouter(
     ),
   ),
 );
-
