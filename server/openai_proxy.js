@@ -356,6 +356,98 @@ Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan.
   }
 }
 
+const PROMPT_LENGTH_SAMPLES = Object.freeze({
+  coffee: {
+    profile: { name: 'Aylin' },
+    inputs: {
+      topic: 'general',
+      style: 'practical',
+      imageBase64s: ['sample-cup', 'sample-saucer'],
+    },
+  },
+  tarot: {
+    profile: { name: 'Aylin' },
+    inputs: {
+      topic: 'general',
+      style: 'practical',
+      cards: ['Deli', 'Yildiz', 'Asiklar'],
+    },
+  },
+  palm: {
+    profile: { name: 'Aylin' },
+    inputs: {
+      topic: 'general',
+      style: 'practical',
+      imageBase64: 'sample-palm',
+    },
+  },
+  astro: {
+    profile: { name: 'Aylin', zodiac: 'Akrep' },
+    inputs: {
+      topic: 'general',
+      style: 'practical',
+      zodiac: 'Akrep',
+    },
+  },
+  dream: {
+    profile: { name: 'Aylin' },
+    inputs: {
+      style: 'practical',
+      text: 'Ruyamda deniz kiyisinda yururken parlak bir yildiz gordum ve eski bir kapiyi actim.',
+    },
+  },
+  motivation: {
+    profile: { name: 'Aylin' },
+    inputs: {
+      text: 'Bugun odagimi toplamak ve sakin kalmak istiyorum.',
+    },
+  },
+});
+
+function sampleInputCharCount(profile, inputs) {
+  const rawParts = [
+    pickFirstString(profile?.name),
+    pickFirstString(profile?.zodiac, inputs?.zodiac),
+    pickFirstString(inputs?.topic),
+    pickFirstString(inputs?.style),
+    pickFirstString(inputs?.styleHintTr),
+    pickFirstString(inputs?.text),
+    ...normalizeCards(inputs?.cards),
+  ].filter(Boolean);
+  return rawParts.join('\n').length;
+}
+
+function sampleImageCount(inputs) {
+  const list = Array.isArray(inputs?.imageBase64s) ? inputs.imageBase64s : [];
+  const single = typeof inputs?.imageBase64 === 'string' && inputs.imageBase64.trim() ? 1 : 0;
+  return list.filter((item) => typeof item === 'string' && item.trim()).length + single;
+}
+
+function buildPromptLengthSummary() {
+  return Object.fromEntries(
+    Object.entries(PROMPT_LENGTH_SAMPLES).map(([type, sample]) => {
+      const { sys, user } = buildPrompt({
+        type,
+        profile: sample.profile,
+        inputs: sample.inputs,
+        locale: 'tr-TR',
+      });
+
+      return [type, {
+        systemChars: sys.length,
+        userChars: user.length,
+        totalChars: sys.length + user.length,
+        maxOutputTokens: 800,
+        sampleInputChars: sampleInputCharCount(sample.profile, sample.inputs),
+        imageCount: sampleImageCount(sample.inputs),
+        acceptsImages: sampleImageCount(sample.inputs) > 0,
+      }];
+    }),
+  );
+}
+
+const PROMPT_LENGTH_SUMMARY = Object.freeze(buildPromptLengthSummary());
+
 function getGeminiApiKey() {
   return (process.env.GEMINI_API_KEY || '').trim();
 }
@@ -591,11 +683,20 @@ app.post('/stream', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 8787;
-app.listen(PORT, () => console.log(`[falla-ai] server listening on ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`[falla-ai] server listening on ${PORT}`);
+  console.log('[prompt-lengths]', JSON.stringify(PROMPT_LENGTH_SUMMARY));
+});
 
 app.get('/health', (req, res) => {
   const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim());
-  res.json({ ok: true, provider: 'gemini', model: GEMINI_MODEL, hasApiKey: hasKey });
+  res.json({
+    ok: true,
+    provider: 'gemini',
+    model: GEMINI_MODEL,
+    hasApiKey: hasKey,
+    promptLengths: PROMPT_LENGTH_SUMMARY,
+  });
 });
 
 setInterval(() => {
