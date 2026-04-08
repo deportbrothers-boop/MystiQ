@@ -8,6 +8,7 @@ import 'features/onboarding/onboarding_page.dart';
 import 'features/auth/signin_page.dart';
 import 'features/auth/signup_page.dart';
 import 'features/home/home_shell.dart';
+import 'features/legal/legal_warning_page.dart';
 import 'features/premium/paywall_page.dart';
 import 'features/readings/coffee/coffee_page_fixed.dart';
 import 'features/readings/tarot/tarot_page.dart';
@@ -21,6 +22,9 @@ import 'features/readings/astro/astro_page.dart';
 import 'features/readings/dream/dream_page.dart';
 import 'features/profile/edit_profile_page.dart';
 import 'features/home/motivation_page.dart';
+
+String _legalWarningLocation(String nextRoute) =>
+    '/legal-warning?next=${Uri.encodeComponent(nextRoute)}';
 
 Future<String> _resolveInitialLocation() async {
   try {
@@ -40,7 +44,12 @@ Future<String> _resolveInitialLocation() async {
       user = null;
     }
 
-    return (remember && user != null) ? '/home' : '/auth';
+    final nextRoute = (remember && user != null) ? '/home' : '/auth';
+    final accepted = prefs.getBool(kLegalWarningAcceptedKey) ?? false;
+    if (!accepted) {
+      return _legalWarningLocation(nextRoute);
+    }
+    return nextRoute;
   } catch (_) {
     return '/auth';
   }
@@ -52,6 +61,22 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/',
       redirect: (_, __) async => await _resolveInitialLocation(),
+    ),
+    GoRoute(
+      path: '/legal-warning',
+      redirect: (_, state) async {
+        final prefs = await SharedPreferences.getInstance();
+        final accepted = prefs.getBool(kLegalWarningAcceptedKey) ?? false;
+        if (!accepted) return null;
+        final nextRoute = state.uri.queryParameters['next'];
+        if (nextRoute != null && nextRoute.startsWith('/')) {
+          return nextRoute;
+        }
+        return '/auth';
+      },
+      builder: (_, state) => LegalWarningPage(
+        nextRoute: state.uri.queryParameters['next'] ?? '/auth',
+      ),
     ),
     GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
     GoRoute(path: '/auth', builder: (_, __) => const SignInPage()),

@@ -17,7 +17,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   void _next() {
     if (index < 2) {
-      controller.nextPage(duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
+      controller.nextPage(
+          duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
     } else {
       _askNotificationsThenGo();
     }
@@ -31,8 +32,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
         title: Text(loc.t('onb.notifications_title')),
         content: Text(loc.t('onb.notifications_body')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.t('common.no'))),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text(loc.t('common.yes'))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(loc.t('common.no'))),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(loc.t('common.yes'))),
         ],
       ),
     );
@@ -43,7 +48,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     } catch (_) {
       // izin/schedule hatası akışı durdurmasın
     } finally {
-      if (mounted) context.go('/auth');
+      if (mounted) context.go('/legal-warning?next=%2Fauth');
     }
   }
 
@@ -59,9 +64,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 controller: controller,
                 onPageChanged: (i) => setState(() => index = i),
                 children: [
-                  _Slide(title: loc.t('onb.1.title'), text: loc.t('onb.1.text')),
-                  _Slide(title: loc.t('onb.2.title'), text: loc.t('onb.2.text')),
-                  _Slide(title: loc.t('onb.3.title'), text: loc.t('onb.3.text')),
+                  _Slide(
+                      title: loc.t('onb.1.title'), text: loc.t('onb.1.text')),
+                  _Slide(
+                      title: loc.t('onb.2.title'), text: loc.t('onb.2.text')),
+                  _Slide(
+                      title: loc.t('onb.3.title'), text: loc.t('onb.3.text')),
                 ],
               ),
             ),
@@ -71,12 +79,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   TextButton(
-                    onPressed: () => context.go('/auth'),
+                    onPressed: () => context.go('/legal-warning?next=%2Fauth'),
                     child: Text(loc.t('onb.skip')),
                   ),
                   ElevatedButton(
                     onPressed: _next,
-                    child: Text(index < 2 ? loc.t('onb.next') : loc.t('onb.start')),
+                    child: Text(
+                        index < 2 ? loc.t('onb.next') : loc.t('onb.start')),
                   ),
                 ],
               ),
@@ -102,12 +111,15 @@ class _Slide extends StatelessWidget {
         children: [
           const Icon(Icons.auto_awesome, color: AppTheme.gold, size: 64),
           const SizedBox(height: 24),
-          Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineMedium),
+          Text(title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 12),
-          Text(text, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+          Text(text,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium),
         ],
       ),
     );
   }
 }
-

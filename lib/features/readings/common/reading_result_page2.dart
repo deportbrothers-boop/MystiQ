@@ -463,6 +463,13 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
     return 'Yorumunuz hazırlanıyor, lütfen bekleyin...';
   }
 
+  String _resultDisclaimer(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final message = loc.t('reading.disclaimer');
+    if (message != 'reading.disclaimer') return message;
+    return 'Bu içerik eğlence amaçlıdır; kesinlik içermez.';
+  }
+
   String _reengagementCtaText() {
     final name = _userName();
     final prefix = name.isNotEmpty ? '$name, ' : '';
@@ -746,7 +753,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    'Bu fal için hedef kalan süre: $_speedupTargetLabel',
+                    'Bu yorum için hedef kalan süre: $_speedupTargetLabel',
                     style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ),
@@ -768,14 +775,11 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
                   ),
                 ],
               ),
-              if (widget.type == 'coffee') ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'Bu içerik eğlence amaçlıdır. Kesinlik içermez.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
+              const SizedBox(height: 8),
+              Text(
+                _resultDisclaimer(context),
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
             ],
           ),
         ),

@@ -166,7 +166,7 @@ class _CoffeePageState extends State<CoffeePage>
             messenger.showSnackBar(
               const SnackBar(
                 content: Text(
-                    'Debug mod: reklam yuklenemedi, reklam atlandi ve fal dogrudan baslatildi.'),
+                    'Debug mod: reklam yuklenemedi, reklam atlandi ve yorum dogrudan baslatildi.'),
               ),
             );
           } else {
@@ -182,7 +182,7 @@ class _CoffeePageState extends State<CoffeePage>
           messenger.showSnackBar(
             const SnackBar(
               content: Text(
-                  'Debug mod: reklam akisi hata verdi, reklam atlandi ve fal dogrudan baslatildi.'),
+                  'Debug mod: reklam akisi hata verdi, reklam atlandi ve yorum dogrudan baslatildi.'),
             ),
           );
         } else {

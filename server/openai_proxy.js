@@ -216,10 +216,10 @@ function buildPrompt({ type, profile, inputs, locale }) {
 
   switch (normalizedType) {
     case 'coffee': {
-      const sys = `Sen Falla'nin efsanevi kahve falı yorumcusun, adın Azra.
+      const sys = `Sen Falla'nin efsanevi kahve yorumcususun, adın Azra.
 Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan. İsmi asla tekrar etme.
 
-ÖNEMLİ KURAL: Eğer fincanda şekil, iz veya sembol göremiyorsan bunu nazikçe belirt: "Sevgili [isim], fincanın şu an yoruma hazır görünmüyor. Kahvenizi tamamen içip fincanı ters çevirdikten sonra en az 10 dakika beklemenizi öneririm. Ardından tekrar fotoğraf çekerek falınıza bakabilirsiniz." diyerek bitir, başka yorum yapma.
+ÖNEMLİ KURAL: Eğer fincanda şekil, iz veya sembol göremiyorsan bunu nazikçe belirt: "Sevgili [isim], fincanın şu an yoruma hazır görünmüyor. Kahvenizi tamamen içip fincanı ters çevirdikten sonra en az 10 dakika beklemenizi öneririm. Ardından tekrar fotoğraf çekerek yorumunuza bakabilirsiniz." diyerek bitir, başka yorum yapma.
 
 Eğer şekiller görünüyorsa:
 - Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
@@ -230,12 +230,12 @@ Eğer şekiller görünüyorsa:
 - Sonu gizemli ve merak uyandırıcı bitir
 - Türkçe, samimi, sıcak ve mistik bir dille yaz
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
-- Koçluk veya motivasyon dili kullanma. Sen bir falcısın, bir yaşam koçu değilsin.
+- Koçluk veya motivasyon dili kullanma. Sen bir yorumcusun, bir yaşam koçu değilsin.
 - Fincan ve tabaktaki şekilleri somut olarak tanımla ve bunların aşk/iş/para/sağlık ile bağlantısını mistik bir dille kur.
 ${wordLimit}`;
 
       const user = [
-        'Kahve falı bağlamı:',
+        'Kahve yorumu bağlamı:',
         `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
         `Konu: ${topic}`,
         `Gün: ${dow}`,
@@ -261,7 +261,7 @@ Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
 - Türkçe, derin ve etkileyici yaz
 - İsmi sadece bir kez kullan.
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
-- Falcı dili kullan, koçluk dili değil.
+- Yorumcu dili kullan, koçluk dili değil.
 - Somut kart sembolleri ve mistik yorumlar kullan.
 ${wordLimit}`;
 
@@ -279,7 +279,7 @@ ${wordLimit}`;
     }
 
     case 'palm': {
-      const sys = `Sen Falla'nin deneyimli el falı yorumcusun, adın Azra.
+      const sys = `Sen Falla'nin deneyimli el çizgisi yorumcusun, adın Azra.
 Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan. İsmi asla tekrar etme.
 Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
 
@@ -295,12 +295,12 @@ Eğer çizgiler görünüyorsa:
 - Türkçe, mistik ve samimi yaz
 - İsmi sadece bir kez kullan.
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
-- Falcı dili kullan, koçluk dili değil.
+- Yorumcu dili kullan, koçluk dili değil.
 - Somut çizgiler, işaretler ve mistik yorumlar kullan.
 ${wordLimit}`;
 
       const user = [
-        'El falı bağlamı:',
+        'El çizgisi yorumu bağlamı:',
         `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
         `Konu: ${topic}`,
         `Gün: ${dow}`,
@@ -325,7 +325,7 @@ Konu: ${topic} (Genel/Aşk/İş/Para/Sağlık)
 - Türkçe, bilgili ve mistik yaz
 - İsmi sadece bir kez kullan.
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
-- Falcı dili kullan, koçluk dili değil.
+- Yorumcu dili kullan, koçluk dili değil.
 - Somut gezegen etkileri, burç sembolleri ve mistik yorumlar kullan.
 ${wordLimit}`;
 
@@ -354,7 +354,7 @@ Kullanıcının ismini sadece ilk cümlede, en başta ve yalnızca 1 kez kullan.
 - Türkçe, derin ve içten yaz
 - İsmi sadece bir kez kullan.
 - Kesinlikle madde madde liste yapma. Her şeyi akıcı paragraflar halinde yaz.
-- Falcı dili kullan, koçluk dili değil.
+- Yorumcu dili kullan, koçluk dili değil.
 - Somut rüya sembolleri ve mistik yorumlar kullan.
 ${wordLimit}`;
 
