@@ -51,7 +51,11 @@ app.use((req, res, next) => {
   return res.status(401).json({ error: 'unauthorized' });
 });
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODELS = Object.freeze([
+  'gemini-2.5-flash',
+  'gemini-2.0-flash-001',
+  'gemini-1.5-flash',
+]);
 
 /*
 // Lazy OpenAI client kept commented for future provider work.
@@ -582,6 +586,10 @@ function logResponseStats(type, text) {
   console.log(`[${type}] words:${wordCount} chars:${charCount} tokens:${Math.round(charCount / 4)}`);
 }
 
+function shouldRetryGeminiModel(status) {
+  return status === 429 || status === 503;
+}
+
 async function generateWithGemini({ type, profile, inputs, locale, body }) {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
@@ -622,47 +630,75 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
   };
   const payloadSystemText = payload.systemInstruction?.parts?.[0]?.text || '';
 
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-
-  const raw = await resp.text();
+  let selectedModel = GEMINI_MODELS[0];
+  let text = '';
+  let usage = null;
   let data = {};
-  try {
-    data = raw ? JSON.parse(raw) : {};
-  } catch (_) {
-    data = { raw };
+  let lastError = null;
+
+  for (let index = 0; index < GEMINI_MODELS.length; index += 1) {
+    const modelName = GEMINI_MODELS[index];
+    selectedModel = modelName;
+
+    try {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const raw = await resp.text();
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        data = { raw };
+      }
+
+      if (!resp.ok) {
+        const err = new Error(data?.error?.message || raw || 'gemini_error');
+        err.status = resp.status;
+        err.response = { data };
+        throw err;
+      }
+
+      text = extractGeminiText(data);
+      if (!text) {
+        const err = new Error(data?.promptFeedback?.blockReason || 'empty_gemini_response');
+        err.status = 502;
+        err.response = { data };
+        throw err;
+      }
+
+      usage = geminiUsageToOpenAI(data?.usageMetadata);
+      break;
+    } catch (err) {
+      lastError = err;
+      const status = err?.status || err?.response?.status || 500;
+      const canRetry = shouldRetryGeminiModel(status) && index < GEMINI_MODELS.length - 1;
+      if (canRetry) {
+        console.warn(`[gemini-fallback] model ${modelName} failed with ${status}, trying next`);
+        continue;
+      }
+      throw err;
+    }
   }
 
-  if (!resp.ok) {
-    const err = new Error(data?.error?.message || raw || 'gemini_error');
-    err.status = resp.status;
-    err.response = { data };
-    throw err;
-  }
-
-  const text = extractGeminiText(data);
   if (!text) {
-    const err = new Error(data?.promptFeedback?.blockReason || 'empty_gemini_response');
-    err.status = 502;
-    err.response = { data };
-    throw err;
+    throw lastError || new Error('gemini_fallback_failed');
   }
 
-  const usage = geminiUsageToOpenAI(data?.usageMetadata);
   return {
     text,
     usage,
     raw: data,
     debug: {
+      modelUsed: selectedModel,
       normalizedType,
       buildPromptCalled: true,
       sys,
@@ -684,6 +720,7 @@ app.post('/generate', async (req, res) => {
     if (r.debug?.normalizedType === 'coffee') {
       const sys = r.debug.sys || '';
       console.log('BUILD_PROMPT_CALLED:', r.debug.buildPromptCalled === true);
+      console.log('GEMINI_MODEL_USED:', r.debug.modelUsed || '');
       console.log('SYS_PROMPT_FULL:', sys);
       console.log('SYS_PROMPT_FIRST_100:', sys.slice(0, 100));
       console.log('SYS_PROMPT_HAS_TOPIC:', sys.includes('aşk') || sys.includes('topic'));
@@ -774,7 +811,8 @@ app.get('/health', (req, res) => {
   res.json({
     ok: true,
     provider: 'gemini',
-    model: GEMINI_MODEL,
+    model: GEMINI_MODELS[0],
+    fallbackModels: GEMINI_MODELS,
     hasApiKey: hasKey,
     promptLengths: PROMPT_LENGTH_SUMMARY,
   });
