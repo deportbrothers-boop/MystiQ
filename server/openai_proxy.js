@@ -604,6 +604,7 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
     ? body.temperature
     : ((normalizedType === 'dream') ? 0.3 : 0.85);
 
+  // Gemini expects systemInstruction + contents, not OpenAI-style messages.
   const payload = {
     systemInstruction: {
       parts: [{ text: sys }],
