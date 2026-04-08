@@ -30,6 +30,7 @@ Node (proxy server)
 server/node_modules/
 server/npm-debug.log*
 server/.env
+assets/config/ai.json
 
 Logs
 npm-debug.log*
