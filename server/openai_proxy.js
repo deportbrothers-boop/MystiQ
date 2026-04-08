@@ -1,4 +1,4 @@
-// Simple AI proxy for Falla
+﻿// Simple AI proxy for Falla
 import 'dotenv/config';
 // - Exposes POST /generate (JSON) and POST /stream (SSE-like)
 // - Reads Gemini API key from env: GEMINI_API_KEY
@@ -620,6 +620,7 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
       maxOutputTokens: getMaxOutputTokens(normalizedType),
     },
   };
+  const payloadSystemText = payload.systemInstruction?.parts?.[0]?.text || '';
 
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
@@ -657,7 +658,17 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
   }
 
   const usage = geminiUsageToOpenAI(data?.usageMetadata);
-  return { text, usage, raw: data };
+  return {
+    text,
+    usage,
+    raw: data,
+    debug: {
+      normalizedType,
+      buildPromptCalled: true,
+      sys,
+      payloadSystemText,
+    },
+  };
 }
 
 app.post('/generate', async (req, res) => {
@@ -670,6 +681,14 @@ app.post('/generate', async (req, res) => {
       locale,
       body: req.body || {},
     });
+    if (r.debug?.normalizedType === 'coffee') {
+      const sys = r.debug.sys || '';
+      console.log('BUILD_PROMPT_CALLED:', r.debug.buildPromptCalled === true);
+      console.log('SYS_PROMPT_FULL:', sys);
+      console.log('SYS_PROMPT_FIRST_100:', sys.slice(0, 100));
+      console.log('SYS_PROMPT_HAS_TOPIC:', sys.includes('aşk') || sys.includes('topic'));
+      console.log('GEMINI_SYSTEM_INSTRUCTION_TEXT:', r.debug.payloadSystemText || '');
+    }
     console.log('USAGE:', JSON.stringify(r.usage));
     logResponseStats(type, r.text);
 
