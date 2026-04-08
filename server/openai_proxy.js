@@ -245,12 +245,12 @@ Türkçe yaz. Akıcı paragraflar halinde ilerle.
 ${wordLimit}`;
 
       const user = [
-        'Kahve yorumu bağlamı:',
+        `Kahve yorumu bağlamı:`,
         `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
         `Konu: ${topic}`,
         `Gün: ${dow}`,
         `Kullanıcının notu: ${text || 'Belirtilmedi.'}`,
-        'Gönderilen görseller fincanın içi ve varsa tabak görüntüleridir. Önce fincanda okunabilir şekiller olup olmadığını kontrol et.',
+        `Gönderilen görseller fincanın içi ve varsa tabak görüntüleridir. Önce fincanda okunabilir şekiller olup olmadığını kontrol et.`,
         extraNotes,
       ].filter(Boolean).join('\n');
 
@@ -274,11 +274,11 @@ Türkçe yaz. Akıcı paragraflar halinde ilerle.
 ${wordLimit}`;
 
       const user = [
-        'Tarot bağlamı:',
+        `Tarot bağlamı:`,
         `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
         `Konu: ${topic}`,
         `Kullanıcının sorusu: ${text || 'Belirtilmedi.'}`,
-        'Kartlar:',
+        `Kartlar:`,
         formatTarotCards(cards),
         extraNotes,
       ].filter(Boolean).join('\n');
@@ -302,12 +302,12 @@ Türkçe yaz. Akıcı paragraflar halinde ilerle.
 ${wordLimit}`;
 
       const user = [
-        'El çizgisi yorumu bağlamı:',
+        `El çizgisi yorumu bağlamı:`,
         `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
         `Konu: ${topic}`,
         `Gün: ${dow}`,
         `Kullanıcının notu: ${text || 'Belirtilmedi.'}`,
-        'Gönderilen görsel el fotoğrafıdır. Önce çizgilerin net görünüp görünmediğini kontrol et.',
+        `Gönderilen görsel el fotoğrafıdır. Önce çizgilerin net görünüp görünmediğini kontrol et.`,
         extraNotes,
       ].filter(Boolean).join('\n');
 
@@ -331,7 +331,7 @@ Türkçe yaz. Akıcı paragraflar halinde ilerle.
 ${wordLimit}`;
 
       const user = [
-        'Astroloji bağlamı:',
+        `Astroloji bağlamı:`,
         `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
         `Kullanıcı burcu: ${zodiac}`,
         `Konu: ${topic}`,
@@ -359,9 +359,9 @@ Türkçe yaz. Akıcı paragraflar halinde ilerle.
 ${wordLimit}`;
 
       const user = [
-        'Rüya bağlamı:',
+        `Rüya bağlamı:`,
         `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
-        'Rüya metni:',
+        `Rüya metni:`,
         text || 'Belirtilmedi.',
         extraNotes,
       ].filter(Boolean).join('\n');
@@ -375,13 +375,13 @@ ${wordLimit}`;
         .map((item) => `${item.role === 'assistant' ? 'Asistan' : 'Kullanıcı'}: ${item.text}`)
         .join('\n');
       const user = [
-        'Sohbet modu.',
-        'Sadece cevap metnini döndür; başlık, madde listesi veya meta açıklama ekleme.',
+        `Sohbet modu.`,
+        `Sadece cevap metnini döndür; başlık, madde listesi veya meta açıklama ekleme.`,
         transcript ? `Geçmiş:\n${transcript}` : '',
         `Son mesaj: ${text || 'Belirtilmedi.'}`,
       ].filter(Boolean).join('\n\n');
       return {
-        sys: 'Sen Falla asistanısın. Türkçe, kısa ve doğal cevap ver.',
+        sys: `Sen Falla asistanısın. Türkçe, kısa ve doğal cevap ver.`,
         user,
       };
     }
@@ -402,7 +402,7 @@ ${wordLimit}`,
 
     default:
       return {
-        sys: 'Sen Falla için Türkçe yorum üreten bir asistansın. Sadece yorum metnini döndür.',
+        sys: `Sen Falla için Türkçe yorum üreten bir asistansın. Sadece yorum metnini döndür.`,
         user: `Kullanıcı adı: ${name}\nNot: ${text || 'Belirtilmedi.'}`,
       };
   }
