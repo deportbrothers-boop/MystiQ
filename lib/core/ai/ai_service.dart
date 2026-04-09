@@ -593,24 +593,8 @@ class AiService {
     final typeHint = (extras['typeHint'] ?? '').toString();
     if (typeHint == 'coffee') {
       final prev = (extras['prevIntroSig'] ?? '').toString().trim();
-      out['styleHintTr'] = 'MYSTIQ – Kahve Yorumu çıktı kuralları:\n'
-          '1) Kullanıcı adı mutlaka geçmeli: ilk paragraf "${(extras['userName'] ?? '').toString().trim()}, ..." diye başlamalı ve isim toplam 1–2 kez geçmeli.\n'
-          '2) Uzunluk: 900–1500 karakter; 4–5 kısa paragraf akıcı anlatım.\n'
-          '3) Ton: sıcak, samimi, sezgisel. Kesin hüküm yok; "olacak/kesin" yok. Gelecek tahmini yok.\n'
-          '4) Yapı sırası: (A) Açılış (isim + fincanın genel havası + gün/ritim) '
-          '(B) 2–3 şekil/iz + duygu diliyle yorum '
-          '(C) Günün teması '
-          '(D) "Bugünün Mini Önerileri:" altında 2 satır: 1 sosyal, 1 içsel '
-          '(E) Kapanış + geri çağırma CTA.\n'
-          '5) Kapanış CTA zorunlu: "fincanın/ kahve yorumunun sonuna geliyorken" hissi + tekrar çağır.\n'
-          'Format zorunlu:\n'
-          '- İlk satır: "Kahve Yorumu"\n'
-          '- 4–5 paragraf\n'
-          '- "Bugünün Mini Önerileri:" başlığı ve altında iki madde "- ..."\n'
-          '- En alt satır: "Bu içerik eğlence amaçlıdır; kesinlik içermez."\n'
-          'Yasaklar: tarih/süre vermek, "yakında/ileride/gelecekte", kesinlik/garanti.\n'
-          '${prev.isNotEmpty ? 'Önceki giriş kalıbını tekrar etme: "$prev".\n' : ''}'
-          'Çıktıda markdown/numaralı liste yok; sadece istenen başlık ve mini öneriler maddeleri var.';
+      out['topic'] = extras['topic'] ?? '';
+      out['styleHintTr'] = '';
       out['userName'] = (extras['userName'] ?? '').toString();
       out['length'] = 'long';
       out['formatHint'] = 'coffee_policy_v2';

@@ -8,6 +8,8 @@ import 'features/history/history_controller.dart';
 import 'core/rewards/rewards_controller.dart';
 import 'features/profile/profile_controller.dart';
 import 'core/ads/ad_service.dart';
+import 'core/ads/rewarded_ads.dart';
+import 'core/purchase/purchase_service.dart';
 import 'core/ads/consent_helper.dart';
 import 'core/i18n/app_localizations.dart';
 import 'core/i18n/locale_controller.dart';
@@ -63,6 +65,8 @@ Future<void> main() async {
     final profile = ProfileController();
 
     entitlements.load();
+    await PurchaseService.init();
+    RewardedAds.init(entitlements);
     history.load();
     locale.load();
     rewards.load();

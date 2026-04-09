@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../common/widgets/starry_background.dart';
 import '../../core/ads/rewarded_helper.dart';
 import '../../core/entitlements/entitlements_controller.dart';
 import '../../core/i18n/app_localizations.dart';
+import '../../core/purchase/purchase_service.dart';
 import '../../theme/app_theme.dart';
 
 /// Bu projede gerçek para ile ödeme yoktur.
@@ -22,13 +24,52 @@ class PaywallPage extends StatelessWidget {
   }
 }
 
-class _EarnCoinsView extends StatelessWidget {
+class _EarnCoinsView extends StatefulWidget {
   const _EarnCoinsView();
+  @override
+  State<_EarnCoinsView> createState() => _EarnCoinsViewState();
+}
+
+class _EarnCoinsViewState extends State<_EarnCoinsView> {
+  List<Package> _packages = [];
+  bool _loading = true;
+  bool _purchasing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final pkgs = await PurchaseService.getPackages();
+    if (mounted) setState(() { _packages = pkgs; _loading = false; });
+  }
+
+  Future<void> _buy(Package pkg) async {
+    setState(() => _purchasing = true);
+    final ent = context.read<EntitlementsController>();
+    final ok = await PurchaseService.purchase(pkg, ent);
+    if (mounted) {
+      setState(() => _purchasing = false);
+      if (ok) Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _restore() async {
+    setState(() => _purchasing = true);
+    final ent = context.read<EntitlementsController>();
+    final ok = await PurchaseService.restore(ent);
+    if (mounted) {
+      setState(() => _purchasing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? 'Abonelik geri yüklendi' : 'Aktif abonelik bulunamadı')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final ent = context.watch<EntitlementsController>();
-    final loc = AppLocalizations.of(context);
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -41,103 +82,42 @@ class _EarnCoinsView extends StatelessWidget {
           ),
         ],
       ),
-      body: StarryBackground(
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF0B0A0E), Color(0xFF121018)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 8),
-                const Text(
-                  'Coin Kazan',
-                  style: TextStyle(color: AppTheme.gold, fontSize: 24, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF121018),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.gold.withValues(alpha: 0.45), width: 1.4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.gold.withValues(alpha: 0.25),
-                          blurRadius: 18,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.ondemand_video_outlined, color: AppTheme.gold),
-                        SizedBox(width: 12),
-                        Expanded(
+      body: SafeArea(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  const SizedBox(height: 16),
+                  const Text('Pro\'ya Geç', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  const Text('Reklamlara son, sınırsız yorum', style: TextStyle(fontSize: 14)),
+                  const SizedBox(height: 24),
+                  if (_packages.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('Paketler yüklenemedi. Lütfen tekrar dene.'),
+                    )
+                  else
+                    ..._packages.map((pkg) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _purchasing ? null : () => _buy(pkg),
                           child: Text(
-                            'Bu uygulamada gerçek para ile ödeme yoktur. Coin yalnızca reklam izleyerek kazanılır.',
-                            style: TextStyle(fontWeight: FontWeight.w600),
+                            '${pkg.storeProduct.title} — ${pkg.storeProduct.priceString}',
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Mevcut Coin: ${ent.coins}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.gold,
-                        fontWeight: FontWeight.w700,
                       ),
-                ),
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.ondemand_video_outlined),
-                      label: Text(loc.t('paywall.watch_ad')),
-                      onPressed: () async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        final ok = await RewardedAds.show(context: context);
-                        if (ok && context.mounted) {
-                          await ent.addCoins(10);
-                          messenger.showSnackBar(SnackBar(content: Text(loc.t('paywall.ad_coin_added'))));
-                        }
-                      },
-                    ),
+                    )),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _purchasing ? null : _restore,
+                    child: const Text('Satın alımı geri yükle'),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Text(
-                    'Reklam izleyerek coin biriktirebilir ve yorum alabilirsiniz.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.muted),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
-                  child: Text(
-                    'Bu içerik eğlence amaçlıdır. Kesinlik içermez.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.muted),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+                  const SizedBox(height: 16),
+                ],
+              ),
       ),
     );
   }
