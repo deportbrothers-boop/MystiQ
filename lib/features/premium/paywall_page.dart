@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
 import '../../common/widgets/starry_background.dart';
-import '../../core/ads/rewarded_helper.dart';
+import '../../core/ads/rewarded_ads.dart';
 import '../../core/entitlements/entitlements_controller.dart';
 import '../../core/i18n/app_localizations.dart';
 import '../../core/purchase/purchase_service.dart';
@@ -70,6 +70,7 @@ class _EarnCoinsViewState extends State<_EarnCoinsView> {
 
   @override
   Widget build(BuildContext context) {
+    final ent = context.watch<EntitlementsController>();
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -85,38 +86,68 @@ class _EarnCoinsViewState extends State<_EarnCoinsView> {
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  const SizedBox(height: 16),
-                  const Text('Pro\'ya Geç', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  const Text('Reklamlara son, sınırsız yorum', style: TextStyle(fontSize: 14)),
-                  const SizedBox(height: 24),
-                  if (_packages.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text('Paketler yüklenemedi. Lütfen tekrar dene.'),
-                    )
-                  else
-                    ..._packages.map((pkg) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _purchasing ? null : () => _buy(pkg),
-                          child: Text(
-                            '${pkg.storeProduct.title} — ${pkg.storeProduct.priceString}',
-                          ),
-                        ),
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    const Text('Coin Kazan',
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    Text('Mevcut Coin: ${ent.coins}'),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final ok = await RewardedAds.show(context: context);
+                          if (ok && context.mounted) {
+                            await context.read<EntitlementsController>().addCoins(10);
+                          }
+                        },
+                        icon: const Icon(Icons.ondemand_video_outlined),
+                        label: const Text('Reklam İzle'),
                       ),
-                    )),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: _purchasing ? null : _restore,
-                    child: const Text('Satın alımı geri yükle'),
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Reklam izleyerek coin biriktirebilir ve yorum alabilirsiniz.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    if (_packages.isNotEmpty) ...[
+                      const SizedBox(height: 32),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      const Text("Pro'ya Geç",
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      const Text('Reklamlara son, sınırsız yorum'),
+                      const SizedBox(height: 16),
+                      ..._packages.map((pkg) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _purchasing ? null : () => _buy(pkg),
+                                child: Text(
+                                    '${pkg.storeProduct.title} — ${pkg.storeProduct.priceString}'),
+                              ),
+                            ),
+                          )),
+                      TextButton(
+                        onPressed: _purchasing ? null : _restore,
+                        child: const Text('Satın alımı geri yükle'),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Bu içerik eğlence amaçlıdır; kesinlik içermez.',
+                      style: TextStyle(fontSize: 11),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
       ),
     );
