@@ -213,12 +213,13 @@ function buildPrompt({ type, profile, inputs, locale }) {
   const text = pickFirstString(inputs?.text);
   const style = pickFirstString(inputs?.style);
   const styleHintTr = pickFirstString(inputs?.styleHintTr);
+  const effectiveStyleHint = normalizedType === 'coffee' ? '' : styleHintTr;
   const cards = normalizeCards(inputs?.cards);
   const dow = new Date().toLocaleDateString(locale || 'tr-TR', { weekday: 'long' });
 
   const extraNotes = [
     style ? `Kullanıcının talep ettiği ton: ${style}` : '',
-    styleHintTr ? `Ek stil notu: ${styleHintTr}` : '',
+    effectiveStyleHint ? `Ek stil notu: ${effectiveStyleHint}` : '',
   ]
     .filter(Boolean)
     .join('\n');
