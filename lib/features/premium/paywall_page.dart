@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -100,6 +101,15 @@ class _EarnCoinsViewState extends State<_EarnCoinsView> {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () async {
+                          if (kDebugMode) {
+                            await context.read<EntitlementsController>().addCoins(50);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Test: 50 coin eklendi')),
+                              );
+                            }
+                            return;
+                          }
                           final ok = await RewardedAds.show(context: context);
                           if (ok && context.mounted) {
                             await context.read<EntitlementsController>().addCoins(10);
