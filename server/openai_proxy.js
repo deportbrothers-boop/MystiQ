@@ -717,6 +717,13 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
 }
 
 app.post('/generate', async (req, res) => {
+  console.log('INCOMING_BODY:', JSON.stringify({
+    type: req.body?.type,
+    topic: req.body?.inputs?.topic,
+    styleHintTr: req.body?.inputs?.styleHintTr,
+    formatHint: req.body?.inputs?.formatHint,
+    userName: req.body?.inputs?.userName,
+  }));
   try {
     const { type, profile, inputs, locale } = req.body || {};
     const r = await generateWithGemini({
