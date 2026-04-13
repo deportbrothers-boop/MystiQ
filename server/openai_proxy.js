@@ -137,7 +137,7 @@ function formatTarotCards(cards) {
 function resolveProfile(profile, body) {
   return {
     ...(profile || {}),
-    name: pickFirstString(body?.inputs?.userName, body?.userName, body?.name, profile?.name)
+    name: pickFirstString(body?.inputs?.userName, body?.userName, body?.name, profile?.name),
     zodiac: pickFirstString(body?.zodiac, body?.sign, profile?.zodiac),
   };
 }
@@ -637,7 +637,6 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
       maxOutputTokens: getMaxOutputTokens(normalizedType),
     },
   };
-  const payloadSystemText = payload.systemInstruction?.parts?.[0]?.text || '';
 
   let selectedModel = GEMINI_MODELS[0];
   let text = '';
@@ -709,21 +708,11 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
     debug: {
       modelUsed: selectedModel,
       normalizedType,
-      buildPromptCalled: true,
-      sys,
-      payloadSystemText,
     },
   };
 }
 
 app.post('/generate', async (req, res) => {
-  console.log('INCOMING_BODY:', JSON.stringify({
-    type: req.body?.type,
-    topic: req.body?.inputs?.topic,
-    styleHintTr: req.body?.inputs?.styleHintTr,
-    formatHint: req.body?.inputs?.formatHint,
-    userName: req.body?.inputs?.userName,
-  }));
   try {
     const { type, profile, inputs, locale } = req.body || {};
     const r = await generateWithGemini({
@@ -733,15 +722,7 @@ app.post('/generate', async (req, res) => {
       locale,
       body: req.body || {},
     });
-    if (r.debug?.normalizedType === 'coffee') {
-      const sys = r.debug.sys || '';
-      console.log('BUILD_PROMPT_CALLED:', r.debug.buildPromptCalled === true);
-      console.log('GEMINI_MODEL_USED:', r.debug.modelUsed || '');
-      console.log('SYS_PROMPT_FULL:', sys);
-      console.log('SYS_PROMPT_FIRST_100:', sys.slice(0, 100));
-      console.log('SYS_PROMPT_HAS_TOPIC:', sys.includes('aşk') || sys.includes('topic'));
-      console.log('GEMINI_SYSTEM_INSTRUCTION_TEXT:', r.debug.payloadSystemText || '');
-    }
+    console.log('GEMINI_MODEL_USED:', r.debug.modelUsed || '');
     console.log('USAGE:', JSON.stringify(r.usage));
     logResponseStats(type, r.text);
 
