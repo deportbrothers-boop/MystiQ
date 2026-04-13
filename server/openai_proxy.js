@@ -137,7 +137,7 @@ function formatTarotCards(cards) {
 function resolveProfile(profile, body) {
   return {
     ...(profile || {}),
-    name: pickFirstString(body?.userName, body?.name, profile?.name),
+    name: pickFirstString(body?.inputs?.userName, body?.userName, body?.name, profile?.name)
     zodiac: pickFirstString(body?.zodiac, body?.sign, profile?.zodiac),
   };
 }
@@ -207,7 +207,7 @@ function buildPrompt({ type, profile, inputs, locale }) {
   const normalizedType = normalizeReadingType(type);
   const responseConfig = getReadingResponseConfig(normalizedType);
   const wordLimit = responseConfig?.wordLimit || '';
-  const name = pickFirstString(profile?.name, inputs?.userName) || 'danışan';
+  const name = pickFirstString(inputs?.userName, profile?.name) || 'danışan';
   const zodiac = pickFirstString(profile?.zodiac, inputs?.zodiac) || 'Belirtilmedi';
   const topic = normalizeTopic(inputs?.topic);
   const text = pickFirstString(inputs?.text);
