@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -198,7 +198,7 @@ class AiService {
     final baseExtras = <String, dynamic>{
       ...(extras ?? const <String, dynamic>{}),
       'typeHint': 'coffee',
-      // “Aynı giriş kalıbı” tekrarını azaltmak için server'a ipucu
+      // "Aynı giriş kalıbı" tekrarını azaltmak için server'a ipucu
       if (prevSig != null) 'prevIntroSig': prevSig,
       'userName': userName,
       'coffeePolicy': {
@@ -606,10 +606,10 @@ class AiService {
       final userName = (extras['userName'] ?? '').toString().trim();
       out['styleHintTr'] = 'Sistem yönergesi (zorunlu):\n'
           'Sen sembolik bir yorumlayıcısısın. Gelecek hakkında tahmin yapma. Tarih verme. Kesinlik iddiasında bulunma.\n'
-          '“Olacak” yerine “çağrıştırıyor/izlenim veriyor/sembol olarak yorumlanabilir” kullan.\n'
+          '"Olacak" yerine "çağrıştırıyor/izlenim veriyor/sembol olarak yorumlanabilir" kullan.\n'
           'Yorumların yalnızca eğlence amaçlı sembolik çağrışımlara dayanmalı.\n'
           'Uzunluk: 900–1500 karakter; 4–5 kısa paragraf, akıcı anlatım.\n'
-          'Yasaklar: tarih/süre, “yakında/ileride/gelecekte”, kesinlik/garanti.\n'
+          'Yasaklar: tarih/süre, "yakında/ileride/gelecekte", kesinlik/garanti.\n'
           'En alt satır: "Bu içerik eğlence amaçlıdır; kesinlik içermez."';
       out['userName'] = userName;
       out['length'] = 'long';
@@ -645,12 +645,10 @@ class AiService {
   );
 
   static String postProcessCoffeeText(String input) {
-    // Bu fonksiyon artık formatı bozmayacak şekilde minimal temizlik yapar.
     var out = input.replaceAll('\r\n', '\n').trim();
     if (out.isEmpty)
       out = 'Kahve Yorumu\n\nFincandaki şekiller sembolik çağrışımlar veriyor.';
 
-    // Banned/time cümleleri temizle (satır bazlı, mini öneri madde satırlarını koru)
     final lines = out.split('\n');
     final kept = <String>[];
     for (final line in lines) {
@@ -659,13 +657,11 @@ class AiService {
         kept.add('');
         continue;
       }
-      // Mini öneriler satırları kısa ve güvenli olmalı; filtrelemeden geçir ama yapıyı koru
       if (_shouldDropCoffeeSentence(t)) continue;
       kept.add(t);
     }
     out = kept.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
 
-    // En altta zorunlu uyarı
     if (!_containsCoffeeDisclaimer(out)) {
       out = out.trimRight();
       if (!out.endsWith(_coffeeNeutralSuffix)) {
@@ -777,6 +773,8 @@ class AiService {
     return names[((now.weekday - 1) % 7).clamp(0, 6)];
   }
 
+  // *** SADECE BU FONKSİYON DEĞİŞTİRİLDİ ***
+  // Server'dan gelen metni doğrudan kullan, şablon üretme
   static String _formatCoffeeReading({
     required String raw,
     required String userName,
@@ -784,196 +782,15 @@ class AiService {
     String? prevIntroSig,
     int attempt = 0,
   }) {
-    var cleaned = postProcessCoffeeText(raw);
-    cleaned = _ensureCoffeeOutro(cleaned, userName: userName);
-    // Zaten doğru format ise bozma
-    if (cleaned.startsWith('Kahve Yorumu') &&
-        cleaned.contains('Bugünün Mini Önerileri:') &&
-        cleaned.endsWith(_coffeeNeutralSuffix) &&
-        cleaned.length >= _coffeeMinChars &&
-        cleaned.length <= _coffeeMaxChars) {
-      return cleaned;
+    var out = raw.replaceAll('\r\n', '\n').trim();
+    if (out.isEmpty) {
+      out =
+          'Kahve Yorumu\n\nFincandaki şekiller sembolik çağrışımlar veriyor.\n\n$_coffeeNeutralSuffix';
     }
-
-    final now = DateTime.now();
-    final dow =
-        locale.startsWith('tr') ? _weekdayTr(now) : now.weekday.toString();
-    final rnd = Random(now.millisecondsSinceEpoch + attempt * 9973);
-
-    final openings = <String>[
-      'fincanın genel havası sakin ama bir o kadar da canlı bir izlenim veriyor; sanki iç dünyanda küçük bir toparlanma isteği var. Bugünün ritmi $dow gibi: yumuşak ama kararlı.',
-      'fincanın kenarlarında ince akışlar var; bu da düşüncelerin bir araya gelmeye çalıştığı hissini veriyor. $dow ritmi, acele etmeden netleşmeyi çağrıştırıyor.',
-      'fincandaki izler dalga dalga; duyguların birikip sonra yavaşça çözüldüğü gibi. $dow enerjisi, küçük ama bilinçli bir odak değişimini destekliyor.',
-      'fincanın tabanında yoğunluk, ağız kısmında açıklık var; sanki zihnin dolu ama niyetin sadeleşmek istiyor. $dow ritmi, sakin bir toparlanmayı işaret ediyor gibi.',
-    ];
-    var opening = openings[rnd.nextInt(openings.length)];
-    final candidateIntro = 'Kahve Yorumu\n\n$userName, $opening';
-    if (prevIntroSig != null && prevIntroSig.trim().isNotEmpty) {
-      if (_sigFromIntro(candidateIntro) == prevIntroSig.trim().toLowerCase()) {
-        opening =
-            openings[(rnd.nextInt(openings.length - 1) + 1) % openings.length];
-      }
-    }
-
-    final shapes = [
-      ['kuş', 'haberleşme ve içsel ferahlama'],
-      ['yol', 'odak değişimi ve kararları sadeleştirme'],
-      ['anahtar', 'farkındalık ve küçük bir çözüm kapısı'],
-      ['halka', 'sınır/bağ ve tamamlanma hissi'],
-      ['dağ', 'sabır ve iç güç'],
-      ['dalga', 'duygu akışı ve ritim'],
-      ['göz', 'dikkat ve sezgisel uyanıklık'],
-      ['kalp', 'yumuşaklık ve yakınlık ihtiyacı'],
-    ]..shuffle(rnd);
-    final a = shapes[0], b = shapes[1], c = shapes[2];
-
-    final obs = [
-      'Kenar tarafında "${a[0]}" gibi bir iz seçiliyor; bu, ${a[1]} temasını nazikçe hatırlatıyor.',
-      'Orta kısımda "${b[0]}" hissi veren bir çizgi var; ${b[1]} gibi bir çağrışım bırakıyor.',
-      'Tabana yakın yerde "${c[0]}" benzeri bir yoğunluk göze çarpıyor; ${c[1]} sanki öne çıkıyor.',
-      'Bu şekillerin hepsi bir arada, zihninin “çok”tan “öz”e inmeye çalıştığı izlenimini veriyor.',
-    ];
-
-    final theme = [
-      'Günün teması bence “netleştirme”: bir şeyi büyütmeden önce önce çerçevesini çizmek.',
-      'İletişim tarafında “az ama öz” yaklaşımı iyi gelebilir; uzun açıklamalar yerine tek cümlelik niyet.',
-      'Duygusal olarak da “yumuşak sınır” fikri var; hem yakın kalıp hem de kendini korumak gibi.',
-    ];
-
-    final miniSocial = [
-      'Bugün bir kişiye kısa ve içten bir mesaj at; “seni düşündüm” gibi küçük bir temas yeterli.',
-      'Bir konuşmayı uzatmadan, tek bir net soru sorarak iletişimi sadeleştir.',
-      'Sosyal enerjini artırmak için kısa bir yürüyüşe birini dahil etmeyi dene.',
-    ];
-    final miniInner = [
-      '2 dakika gözlerini kapatıp “şu an bende ne ağır?” diye sor; çıkan tek kelimeyi not al.',
-      'Günün sonunda 3 cümlelik bir kapanış yaz: ne hissettim, ne öğrendim, neyi bırakıyorum.',
-      'Niyetini tek cümleye indir ve bunu gün içinde iki kez hatırla.',
-    ];
-
-    final ctas = [
-      'Fincanın sonuna geliyorken, küçük bir detay daha kalmış gibi… Yarın tekrar baktığında izler daha netleşebilir.',
-      'Kahve yorumunun sonuna geliyorken, sanki fincan “ikinci bakış” istiyor… İstersen aynı kahveyi 2. kez yorumlayalım; bazen ikinci bakış daha çok şey söylüyor.',
-      'Bu yorum burada kapanıyor ama fincandaki izler değişir; yeni bir fincanla tekrar geldiğinde kaldığımız yerden devam ederiz.',
-    ];
-
-    final paragraphs = <String>[
-      'Kahve Yorumu\n\n$userName, $opening',
-      obs.join(' '),
-      theme.join(' '),
-      'Bugünün Mini Önerileri:\n- ${miniSocial[rnd.nextInt(miniSocial.length)]}\n- ${miniInner[rnd.nextInt(miniInner.length)]}',
-      '${ctas[rnd.nextInt(ctas.length)]}\n\n$_coffeeNeutralSuffix',
-    ];
-
-    var out =
-        paragraphs.join('\n\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
-
-    // Uzunluk hedefi: kısa kalırsa gözlem cümlelerini genişlet
-    if (out.length < _coffeeMinChars) {
-      final extra = [
-        'Fincanda bazı boşlukların temiz kalması da önemli; sanki zihnin “yer aç” diyor ve bu, daha rahat nefes alma hissi getiriyor.',
-        'İzlerin birbirine yaklaşması, aynı konuya tekrar dönme eğilimini çağrıştırıyor; ama bu kez daha yumuşak bir bakışla.',
-        'Bu satırlar bir kehanet değil; sadece fincandaki şekillerin sembolik çağrışımları olarak okunabilir.',
-      ];
-      out = [
-        paragraphs[0],
-        '${paragraphs[1]} ${extra.join(' ')}',
-        paragraphs[2],
-        paragraphs[3],
-        paragraphs[4],
-      ].join('\n\n').trim();
-    }
-
-    // Çok uzunsa, tema paragrafını kısalt
-    if (out.length > _coffeeMaxChars) {
-      out = [
-        paragraphs[0],
-        paragraphs[1],
-        'Günün teması: netleştirme ve sadeleşme hissi.',
-        paragraphs[3],
-        paragraphs[4],
-      ].join('\n\n').trim();
-    }
-
-    // Son güvenlik
-    out = postProcessCoffeeText(out);
-    out = _ensureCoffeeOutro(out, userName: userName);
-    out = _clampCoffeeWithOutro(out, userName: userName);
-    out = postProcessCoffeeText(out);
-    // Başlık zorunlu
-    if (!out.startsWith('Kahve Yorumu')) {
-      out = 'Kahve Yorumu\n\n$out';
-    }
-    // İsim ilk paragrafta zorunlu
-    if (!out.split('\n\n').first.contains('$userName,')) {
-      out = out.replaceFirst('Kahve Yorumu\n\n', 'Kahve Yorumu\n\n$userName, ');
+    if (!_containsCoffeeDisclaimer(out)) {
+      out = '$out\n\n$_coffeeNeutralSuffix';
     }
     return out;
-  }
-
-  static String _coffeeOutro(String userName) => [
-        '$userName, bu fincanda söylenebilecekler şimdilik bu kadar…',
-        'Ama hislerin hâlâ konuşuyor.',
-        '',
-        'Biraz zaman geçsin,',
-        'içinden tekrar bakmak gelirse',
-        'fincanını yeniden açabilirsin.',
-        'Buradayız.',
-      ].join('\n');
-
-  static String _ensureCoffeeOutro(String input, {required String userName}) {
-    var out = input.replaceAll('\r\n', '\n').trim();
-    if (out.isEmpty) return out;
-
-    // Remove disclaimer temporarily; we will append again after outro.
-    var body = out;
-    if (body.endsWith(_coffeeNeutralSuffix)) {
-      body = body
-          .substring(0, body.length - _coffeeNeutralSuffix.length)
-          .trimRight();
-    }
-
-    final marker = 'bu fincanda söylenebilecekler şimdilik bu kadar';
-    if (!body.toLowerCase().contains(marker)) {
-      body = '$body\n\n${_coffeeOutro(userName)}';
-    }
-
-    // If too short, pad slightly (still symbolic).
-    if (body.length < _coffeeMinChars - 180) {
-      body =
-          '$body\n\nBu satırlar bir kehanet değil; fincandaki şekillerin sembolik çağrışımları olarak yorumlanabilir.';
-    }
-
-    return '$body\n\n$_coffeeNeutralSuffix'.trim();
-  }
-
-  static String _clampCoffeeWithOutro(String input,
-      {required String userName}) {
-    var out = input.replaceAll('\r\n', '\n').trim();
-    if (out.length <= _coffeeMaxChars) return out;
-
-    // Split into [bodyWithoutOutro] + [outro] + [disclaimer]
-    final outro = _coffeeOutro(userName);
-    final marker = 'bu fincanda söylenebilecekler şimdilik bu kadar';
-    final idx = out.toLowerCase().lastIndexOf(marker);
-    if (idx <= 0) {
-      return _clampToRange(out, min: _coffeeMinChars, max: _coffeeMaxChars);
-    }
-
-    // Keep the ending block intact; trim earlier body to fit max.
-    final endBlock = '\n\n$outro\n\n$_coffeeNeutralSuffix';
-    final allowedBody =
-        (_coffeeMaxChars - endBlock.length).clamp(200, _coffeeMaxChars);
-
-    var body = out.substring(0, idx).trimRight();
-    body = _clampToRange(body, min: 0, max: allowedBody);
-    var rebuilt = '$body\n\n$outro\n\n$_coffeeNeutralSuffix'.trim();
-
-    if (rebuilt.length < _coffeeMinChars) {
-      // If clamping made it too short, keep a bit more of the original body if possible.
-      rebuilt = _clampToRange(out, min: _coffeeMinChars, max: _coffeeMaxChars);
-    }
-    return rebuilt;
   }
 
   static bool _shouldDropCoffeeSentence(String sentence) {
