@@ -79,12 +79,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-
-            // Exclude emulator ABIs from release to reduce bundle size.
-            ndk {
-                abiFilters.clear()
-                abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
-            }
         }
         debug {
             // Debug builds:

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -164,6 +164,7 @@ class AiService {
     };
 
     try {
+      debugPrint('PAYLOAD_DEBUG: ${jsonEncode(payload)}');
       final r = await http
           .post(
             Uri.parse(server),
