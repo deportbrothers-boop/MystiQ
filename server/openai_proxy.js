@@ -163,9 +163,9 @@ function resolveInputs(inputs, body) {
 }
 
 const READING_RESPONSE_CONFIG = Object.freeze({
-  coffee: {
-    maxOutputTokens: 800,
-    wordLimit: 'Yanıtın 500 ile 550 kelime arasında olsun, ne fazla ne az.',
+ coffee: {
+    maxOutputTokens: 2048,
+    wordLimit: 'Yorumun tamamı 550 ile 620 kelime arasında olsun. Ne daha az ne daha fazla.',
   },
   tarot: {
     maxOutputTokens: 700,
