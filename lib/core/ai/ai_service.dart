@@ -103,8 +103,8 @@ class AiService {
     }
   }
 
-  static const int _coffeeMinChars = 900;
-  static const int _coffeeMaxChars = 1500;
+  static const int _coffeeMinChars = 200;
+  static const int _coffeeMaxChars = 5000;
   static const int _tarotMinChars = 900;
   static const int _tarotMaxChars = 1500;
   static const int _longMinChars = 900;
