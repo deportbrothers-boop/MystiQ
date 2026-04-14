@@ -53,8 +53,8 @@ app.use((req, res, next) => {
 
 const GEMINI_MODELS = Object.freeze([
   'gemini-2.5-flash',
-  'gemini-2.0-flash-001',
-  'gemini-1.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
 ]);
 
 /*
