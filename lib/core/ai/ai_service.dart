@@ -24,7 +24,7 @@ class AiConfig {
   static Future<AiConfig> load() async {
     var server = const String.fromEnvironment('AI_SERVER_URL', defaultValue: '');
     var stream = const String.fromEnvironment('AI_STREAM_URL', defaultValue: '');
-    var model = const String.fromEnvironment('AI_MODEL', defaultValue: 'gpt-4o-mini');
+    var model = const String.fromEnvironment('AI_MODEL', defaultValue: 'gemini-2.5-flash');
     var token = const String.fromEnvironment('AI_APP_TOKEN', defaultValue: '');
     Map<String, dynamic>? j;
     try {
@@ -33,7 +33,7 @@ class AiConfig {
     } catch (_) {}
     server = server.isNotEmpty ? server : (j?['serverUrl'] ?? '') as String? ?? '';
     stream = stream.isNotEmpty ? stream : (j?['streamUrl'] ?? '') as String? ?? '';
-    model = model.isNotEmpty ? model : (j?['model'] ?? 'gpt-4o-mini') as String? ?? 'gpt-4o-mini';
+    model = model.isNotEmpty ? model : (j?['model'] ?? 'gemini-2.5-flash') as String? ?? 'gemini-2.5-flash';
     token = token.isNotEmpty ? token : (j?['appToken'] ?? '') as String? ?? '';
     if (token.startsWith('UZUN_') || token.toLowerCase().contains('token')) {
       token = '';
@@ -76,6 +76,9 @@ class AiService {
     if (type == 'palm' || type == 'dream' || type == 'astro') {
       return _generateLongSymbolic(type: type, profile: profile, extras: extras, locale: locale);
     }
+    if (type == 'motivation') {
+      return _generateMotivation(profile: profile, extras: extras, locale: locale);
+    }
 
     try {
       return LocalAIGenerator.generate(type: type, profile: profile, extras: extras, locale: locale);
@@ -84,14 +87,9 @@ class AiService {
     }
   }
 
-  static const int _coffeeMinChars = 200;
-  static const int _coffeeMaxChars = 5000;
-  static const int _tarotMinChars = 900;
-  static const int _tarotMaxChars = 1500;
-  static const int _longMinChars = 900;
-  static const int _longMaxChars = 1500;
   static const String _coffeeIntroSigKey = 'coffee_intro_sig_v1';
   static const Duration _httpRequestTimeout = Duration(seconds: 120);
+  static const String _coffeeNeutralSuffix = 'Bu içerik eğlence amaçlıdır; kesinlik içermez.';
 
   static Future<String?> _loadCoffeeIntroSig() async {
     try {
@@ -138,12 +136,9 @@ class AiService {
       'context': _contextInfo(locale: locale),
       'model': cfg.model,
       'temperature': attempt == 0 ? 0.8 : 0.9,
-      'presence_penalty': 0.9,
-      'frequency_penalty': 0.4,
     };
 
     try {
-      debugPrint('PAYLOAD_DEBUG: ${jsonEncode(payload)}');
       final r = await http.post(
         Uri.parse(server),
         headers: {
@@ -162,7 +157,15 @@ class AiService {
     return null;
   }
 
-  // *** KAHVE: Server metnini direkt kullan, local generator'a düşme ***
+  static String _addDisclaimer(String text) {
+    var out = text.replaceAll('\r\n', '\n').trim();
+    if (!_containsCoffeeDisclaimer(out)) {
+      out = '$out\n\n$_coffeeNeutralSuffix';
+    }
+    return out;
+  }
+
+  // KAHVE
   static Future<String> _generateCoffee({
     required UserProfile profile,
     Map<String, dynamic>? extras,
@@ -179,45 +182,29 @@ class AiService {
       'userName': userName,
     };
 
-    // Önce server'dan dene — başarılı olursa direkt döndür
     for (var attempt = 0; attempt < 3; attempt++) {
-      final attemptExtras = <String, dynamic>{...baseExtras, 'attempt': attempt};
       final raw = await _tryRemoteOnce(
         type: 'coffee',
         profile: profile,
-        extras: attemptExtras,
+        extras: <String, dynamic>{...baseExtras, 'attempt': attempt},
         locale: locale,
         cfg: cfg,
         attempt: attempt,
       );
-
       if (raw != null && raw.trim().isNotEmpty) {
-        // Server'dan metin geldi — doğrudan kullan, hiçbir post-processing yapma
-        var out = raw.trim();
-        if (!_containsCoffeeDisclaimer(out)) {
-          out = '$out\n\n$_coffeeNeutralSuffix';
-        }
+        final out = _addDisclaimer(raw);
         await _saveCoffeeIntroSig(_sigFromIntro(out));
         return out;
       }
     }
 
-    // Server tamamen başarısız olursa local fallback
-    final fallbackExtras = <String, dynamic>{...baseExtras, 'attempt': 0};
-    final local = LocalAIGenerator.generate(
-      type: 'coffee',
-      profile: profile,
-      extras: fallbackExtras,
-      locale: locale,
-    );
-    var out = local.trim();
-    if (!_containsCoffeeDisclaimer(out)) {
-      out = '$out\n\n$_coffeeNeutralSuffix';
-    }
+    final local = LocalAIGenerator.generate(type: 'coffee', profile: profile, extras: baseExtras, locale: locale);
+    final out = _addDisclaimer(local);
     await _saveCoffeeIntroSig(_sigFromIntro(out));
     return out;
   }
 
+  // TAROT
   static Future<String> _generateTarot({
     required UserProfile profile,
     Map<String, dynamic>? extras,
@@ -228,46 +215,29 @@ class AiService {
 
     final baseExtras = <String, dynamic>{
       ...(extras ?? const <String, dynamic>{}),
+      'typeHint': 'tarot',
       'userName': userName,
-      'tarotPolicy': {'minChars': _tarotMinChars, 'maxChars': _tarotMaxChars},
     };
 
-    String last = '';
     for (var attempt = 0; attempt < 3; attempt++) {
-      final attemptExtras = <String, dynamic>{...baseExtras, 'attempt': attempt};
       final raw = await _tryRemoteOnce(
-            type: 'tarot',
-            profile: profile,
-            extras: attemptExtras,
-            locale: locale,
-            cfg: cfg,
-            attempt: attempt,
-          ) ??
-          LocalAIGenerator.generate(type: 'tarot', profile: profile, extras: attemptExtras, locale: locale);
-
-      var out = postProcessTarotText(raw);
-
-      if (out.length < _tarotMinChars) {
-        try {
-          final extra = LocalAIGenerator.generate(
-            type: 'tarot',
-            profile: profile,
-            extras: {...attemptExtras, 'attempt': attempt + 7},
-            locale: locale,
-          );
-          out = postProcessTarotText('$out\n\n$extra');
-        } catch (_) {}
+        type: 'tarot',
+        profile: profile,
+        extras: <String, dynamic>{...baseExtras, 'attempt': attempt},
+        locale: locale,
+        cfg: cfg,
+        attempt: attempt,
+      );
+      if (raw != null && raw.trim().isNotEmpty) {
+        return _addDisclaimer(raw);
       }
-
-      last = _clampToRange(out, min: _tarotMinChars, max: _tarotMaxChars);
-      if (last.length >= _tarotMinChars && last.length <= _tarotMaxChars) return last;
     }
 
-    return last.isNotEmpty
-        ? last
-        : 'Tarot\n\nYorum şu anda oluşturulamadı.\n\n$_coffeeNeutralSuffix';
+    final local = LocalAIGenerator.generate(type: 'tarot', profile: profile, extras: baseExtras, locale: locale);
+    return _addDisclaimer(local);
   }
 
+  // PAL, DREAM, ASTRO
   static Future<String> _generateLongSymbolic({
     required String type,
     required UserProfile profile,
@@ -279,45 +249,59 @@ class AiService {
 
     final baseExtras = <String, dynamic>{
       ...(extras ?? const <String, dynamic>{}),
-      'userName': userName,
       'typeHint': type,
-      'symbolicPolicy': {'minChars': _longMinChars, 'maxChars': _longMaxChars, 'noFuture': true},
+      'userName': userName,
     };
 
-    String last = '';
     for (var attempt = 0; attempt < 3; attempt++) {
-      final attemptExtras = <String, dynamic>{...baseExtras, 'attempt': attempt};
       final raw = await _tryRemoteOnce(
-            type: type,
-            profile: profile,
-            extras: attemptExtras,
-            locale: locale,
-            cfg: cfg,
-            attempt: attempt,
-          ) ??
-          LocalAIGenerator.generate(type: type, profile: profile, extras: attemptExtras, locale: locale);
-
-      var out = postProcessSymbolicText(raw);
-
-      if (out.length < _longMinChars) {
-        try {
-          final extra = LocalAIGenerator.generate(
-            type: type,
-            profile: profile,
-            extras: {...attemptExtras, 'attempt': attempt + 7},
-            locale: locale,
-          );
-          out = postProcessSymbolicText('$out\n\n$extra');
-        } catch (_) {}
+        type: type,
+        profile: profile,
+        extras: <String, dynamic>{...baseExtras, 'attempt': attempt},
+        locale: locale,
+        cfg: cfg,
+        attempt: attempt,
+      );
+      if (raw != null && raw.trim().isNotEmpty) {
+        return _addDisclaimer(raw);
       }
-
-      last = _clampToRange(out, min: _longMinChars, max: _longMaxChars);
-      if (last.length >= _longMinChars && last.length <= _longMaxChars) return last;
     }
 
-    return last.isNotEmpty
-        ? last
-        : '${_titleForTypeTr(type)}\n\nYorum şu anda oluşturulamadı.\n\n$_coffeeNeutralSuffix';
+    final local = LocalAIGenerator.generate(type: type, profile: profile, extras: baseExtras, locale: locale);
+    return _addDisclaimer(local);
+  }
+
+  // MOTİVASYON
+  static Future<String> _generateMotivation({
+    required UserProfile profile,
+    Map<String, dynamic>? extras,
+    String locale = 'tr',
+  }) async {
+    final cfg = await AiConfig.load();
+    final userName = profile.name.trim().isEmpty ? 'Dostum' : profile.name.trim();
+
+    final baseExtras = <String, dynamic>{
+      ...(extras ?? const <String, dynamic>{}),
+      'typeHint': 'motivation',
+      'userName': userName,
+    };
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final raw = await _tryRemoteOnce(
+        type: 'motivation',
+        profile: profile,
+        extras: <String, dynamic>{...baseExtras, 'attempt': attempt},
+        locale: locale,
+        cfg: cfg,
+        attempt: attempt,
+      );
+      if (raw != null && raw.trim().isNotEmpty) {
+        return raw.trim();
+      }
+    }
+
+    final local = LocalAIGenerator.generate(type: 'motivation', profile: profile, extras: baseExtras, locale: locale);
+    return local.trim();
   }
 
   static Stream<String> streamLiveChat({
@@ -514,54 +498,29 @@ class AiService {
       out['length'] = 'long';
     }
 
+    if (typeHint == 'tarot') {
+      out['userName'] = (extras['userName'] ?? '').toString();
+      out['topic'] = extras['topic'] ?? '';
+    }
+
     if (typeHint == 'dream' || typeHint == 'palm' || typeHint == 'astro') {
-      final userName = (extras['userName'] ?? '').toString().trim();
-      out['styleHintTr'] = 'Sistem yönergesi (zorunlu):\n'
-          'Sen sembolik bir yorumlayıcısısın. Gelecek hakkında tahmin yapma. Tarih verme. Kesinlik iddiasında bulunma.\n'
-          '"Olacak" yerine "çağrıştırıyor/izlenim veriyor/sembol olarak yorumlanabilir" kullan.\n'
-          'Yorumların yalnızca eğlence amaçlı sembolik çağrışımlara dayanmalı.\n'
-          'Uzunluk: 900–1500 karakter; 4–5 kısa paragraf, akıcı anlatım.\n'
-          'Yasaklar: tarih/süre, "yakında/ileride/gelecekte", kesinlik/garanti.\n'
-          'En alt satır: "Bu içerik eğlence amaçlıdır; kesinlik içermez."';
-      out['userName'] = userName;
+      out['userName'] = (extras['userName'] ?? '').toString().trim();
+      out['topic'] = extras['topic'] ?? '';
       out['length'] = 'long';
-      out['formatHint'] = 'symbolic_policy_v1';
+    }
+
+    if (typeHint == 'motivation') {
+      out['userName'] = (extras['userName'] ?? '').toString();
     }
 
     if (extras.containsKey('energy')) out['energy'] = extras['energy'];
-    if (extras.containsKey('length')) out['length'] = extras['length'];
     if (extras.containsKey('premium')) out['premium'] = extras['premium'];
     return out;
   }
 
-  static const String _coffeeNeutralSuffix = 'Bu içerik eğlence amaçlıdır; kesinlik içermez.';
-
-  static String postProcessCoffeeText(String input) {
-    var out = input.replaceAll('\r\n', '\n').trim();
-    if (out.isEmpty) out = 'Kahve Yorumu\n\nFincandaki şekiller sembolik çağrışımlar veriyor.';
-    if (!_containsCoffeeDisclaimer(out)) {
-      out = '$out\n\n$_coffeeNeutralSuffix';
-    }
-    return out;
-  }
-
-  static String postProcessTarotText(String input) {
-    var out = input.replaceAll('\r\n', '\n').trim();
-    if (out.isEmpty) out = 'Tarot\n\nKartlar sembolik çağrışımlar veriyor.';
-    if (!_containsCoffeeDisclaimer(out)) {
-      out = '$out\n\n$_coffeeNeutralSuffix';
-    }
-    return out;
-  }
-
-  static String postProcessSymbolicText(String input) {
-    var out = input.replaceAll('\r\n', '\n').trim();
-    if (out.isEmpty) out = 'Yorum\n\nSemboller sembolik çağrışımlar veriyor.';
-    if (!_containsCoffeeDisclaimer(out)) {
-      out = '$out\n\n$_coffeeNeutralSuffix';
-    }
-    return out;
-  }
+  static String postProcessCoffeeText(String input) => _addDisclaimer(input);
+  static String postProcessTarotText(String input) => _addDisclaimer(input);
+  static String postProcessSymbolicText(String input) => _addDisclaimer(input);
 
   static String _titleForTypeTr(String type) {
     switch (type) {
