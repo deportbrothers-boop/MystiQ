@@ -1,17 +1,14 @@
 ﻿// Simple AI proxy for Falla
 import 'dotenv/config';
-// - Exposes POST /generate (JSON) and POST /stream (SSE-like)
-// - Reads Gemini API key from env: GEMINI_API_KEY
-// - Never expose your API key in the mobile app; run this server on your machine
-
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-// import OpenAI from 'openai';
 
 const app = express();
-// Restrictive CORS: allow configured origins; native apps often have no Origin header
+
+app.set('trust proxy', 1);
+
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map((s) => s.trim())
@@ -38,10 +35,8 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Gemini inline image prompting needs more headroom than the old text-only proxy.
 app.use(express.json({ limit: '20mb' }));
 
-// Optional bearer guard
 const APP_TOKEN = process.env.APP_TOKEN || '';
 app.use((req, res, next) => {
   if (!APP_TOKEN) return next();
@@ -57,18 +52,6 @@ const GEMINI_MODELS = Object.freeze([
   'gemini-2.0-flash-lite',
 ]);
 
-/*
-// Lazy OpenAI client kept commented for future provider work.
-let _client = null;
-function getClient() {
-  if (_client) return _client;
-  const key = process.env.OPENAI_API_KEY || '';
-  if (!key) return null;
-  _client = new OpenAI({ apiKey: key });
-  return _client;
-}
-*/
-
 function pickFirstString(...values) {
   for (const value of values) {
     if (typeof value === 'string' && value.trim()) return value.trim();
@@ -80,31 +63,19 @@ function normalizeTopic(topic) {
   const value = (topic || '').toString().trim();
   const normalized = value.toLocaleLowerCase('tr-TR');
   const map = new Map([
-    ['general', 'Genel'],
-    ['genel', 'Genel'],
-    ['love', 'Aşk'],
-    ['aşk', 'Aşk'],
-    ['ask', 'Aşk'],
-    ['work', 'İş'],
-    ['iş', 'İş'],
-    ['is', 'İş'],
-    ['money', 'Para'],
-    ['para', 'Para'],
-    ['health', 'Sağlık'],
-    ['sağlık', 'Sağlık'],
-    ['saglik', 'Sağlık'],
+    ['general', 'Genel'], ['genel', 'Genel'],
+    ['love', 'Aşk'], ['aşk', 'Aşk'], ['ask', 'Aşk'],
+    ['work', 'İş'], ['iş', 'İş'], ['is', 'İş'],
+    ['money', 'Para'], ['para', 'Para'],
+    ['health', 'Sağlık'], ['sağlık', 'Sağlık'], ['saglik', 'Sağlık'],
   ]);
   return map.get(normalized) || 'Genel';
 }
 
 function normalizeCards(value) {
   if (Array.isArray(value)) {
-    return value
-      .map((item) => (item == null ? '' : String(item).trim()))
-      .filter(Boolean)
-      .slice(0, 3);
+    return value.map((item) => (item == null ? '' : String(item).trim())).filter(Boolean).slice(0, 3);
   }
-
   if (typeof value === 'string' && value.trim()) {
     return value
       .replace(/^Tarot cards:\s*/i, '')
@@ -114,7 +85,6 @@ function normalizeCards(value) {
       .filter(Boolean)
       .slice(0, 3);
   }
-
   return [];
 }
 
@@ -128,10 +98,7 @@ function formatTarotCards(cards) {
       'Kart isimleri paylaşılmadıysa kart adı uydurma; yalnızca pozisyon enerjilerini yorumla.',
     ].join('\n');
   }
-
-  return labels
-    .map((label, index) => `- ${label}: ${cards[index] || 'Belirtilmedi'}`)
-    .join('\n');
+  return labels.map((label, index) => `- ${label}: ${cards[index] || 'Belirtilmedi'}`).join('\n');
 }
 
 function resolveProfile(profile, body) {
@@ -147,7 +114,6 @@ function resolveInputs(inputs, body) {
   const bodyCards = normalizeCards(body?.cards);
   const inputImages = Array.isArray(inputs?.imageBase64s) ? inputs.imageBase64s : [];
   const bodyImages = Array.isArray(body?.imageBase64s) ? body.imageBase64s : [];
-
   return {
     ...(inputs || {}),
     topic: pickFirstString(inputs?.topic, body?.topic),
@@ -163,29 +129,29 @@ function resolveInputs(inputs, body) {
 }
 
 const READING_RESPONSE_CONFIG = Object.freeze({
- coffee: {
+  coffee: {
     maxOutputTokens: 2048,
     wordLimit: 'Yorumun tamamı 550 ile 620 kelime arasında olsun. Ne daha az ne daha fazla.',
   },
   tarot: {
-    maxOutputTokens: 700,
-    wordLimit: 'Yanıtın 450 ile 500 kelime arasında olsun, ne fazla ne az.',
+    maxOutputTokens: 2048,
+    wordLimit: 'Yorumun tamamı 450 ile 500 kelime arasında olsun. Ne daha az ne daha fazla.',
   },
   palm: {
-    maxOutputTokens: 750,
-    wordLimit: 'Yanıtın 400 ile 450 kelime arasında olsun, ne fazla ne az.',
+    maxOutputTokens: 2048,
+    wordLimit: 'Yorumun tamamı 400 ile 450 kelime arasında olsun. Ne daha az ne daha fazla.',
   },
   astro: {
-    maxOutputTokens: 650,
-    wordLimit: 'Yanıtın 350 ile 400 kelime arasında olsun, ne fazla ne az.',
+    maxOutputTokens: 2048,
+    wordLimit: 'Yorumun tamamı 350 ile 400 kelime arasında olsun. Ne daha az ne daha fazla.',
   },
   dream: {
-    maxOutputTokens: 600,
-    wordLimit: 'Yanıtın 300 ile 350 kelime arasında olsun, ne fazla ne az.',
+    maxOutputTokens: 2048,
+    wordLimit: 'Yorumun tamamı 300 ile 350 kelime arasında olsun. Ne daha az ne daha fazla.',
   },
   motivation: {
-    maxOutputTokens: 200,
-    wordLimit: 'Yanıtın 120 ile 150 kelime arasında olsun, ne fazla ne az.',
+    maxOutputTokens: 400,
+    wordLimit: 'Yorumun tamamı 120 ile 150 kelime arasında olsun. Ne daha az ne daha fazla.',
   },
 });
 
@@ -200,7 +166,7 @@ function getReadingResponseConfig(type) {
 }
 
 function getMaxOutputTokens(type) {
-  return getReadingResponseConfig(type)?.maxOutputTokens ?? 800;
+  return getReadingResponseConfig(type)?.maxOutputTokens ?? 2048;
 }
 
 function buildPrompt({ type, profile, inputs, locale }) {
@@ -211,18 +177,8 @@ function buildPrompt({ type, profile, inputs, locale }) {
   const zodiac = pickFirstString(profile?.zodiac, inputs?.zodiac) || 'Belirtilmedi';
   const topic = normalizeTopic(inputs?.topic);
   const text = pickFirstString(inputs?.text);
-  const style = pickFirstString(inputs?.style);
-  const styleHintTr = pickFirstString(inputs?.styleHintTr);
-  const effectiveStyleHint = normalizedType === 'coffee' ? '' : styleHintTr;
   const cards = normalizeCards(inputs?.cards);
   const dow = new Date().toLocaleDateString(locale || 'tr-TR', { weekday: 'long' });
-
-  const extraNotes = [
-    style ? `Kullanıcının talep ettiği ton: ${style}` : '',
-    effectiveStyleHint ? `Ek stil notu: ${effectiveStyleHint}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
 
   switch (normalizedType) {
     case 'coffee': {
@@ -251,7 +207,7 @@ Liste yapma, madde yazma, tire veya numara kullanma.
 "Her şey çok güzel olacak" tarzı yapay umut pompalama.
 İngilizce kelime karıştırma.
 
-UZUNLUK: Yorumun tamamı 550 ile 620 kelime arasında olsun. Ne daha az ne daha fazla.
+UZUNLUK: ${wordLimit}
 FORMAT: Sadece akıcı Türkçe paragraflar. Başlık yok, madde yok, emoji yok.`;
 
       const user = [
@@ -259,12 +215,12 @@ FORMAT: Sadece akıcı Türkçe paragraflar. Başlık yok, madde yok, emoji yok.
         `Konu: ${topic}`,
         `Gün: ${dow}`,
         `Kullanıcı notu: ${text || 'Belirtilmedi.'}`,
-        `Sana ${extraNotes ? extraNotes + ' ' : ''}kahve fincanı ve tabak görselleri gönderildi.`,
+        `Sana kahve fincanı ve tabak görselleri gönderildi.`,
         `Görsellere dikkatle bak. Telvelerde oluşan şekilleri, lekeleri, çizgileri ve kümeleri gerçekten gör.`,
         `Her görselde en az bir somut şekil tanımla — hayvan, insan figürü, nesne, yol, dağ, kuş, el, yüz gibi — ve bunu ${topic} konusuyla ilişkilendir.`,
         `Hiçbir görselde net şekil göremesen bile yorumu yap: telvelerin yoğunluğu, akış yönü ve dağılımı da anlam taşır.`,
         `Yorumun tamamı akıcı Türkçe paragraflardan oluşsun. Madde, liste, başlık, tire kullanma.`,
-        `Yorum 550 ile 620 kelime arasında olsun. Bu kurala kesinlikle uy.`,
+        `UZUNLUK KURALI: ${wordLimit}`,
       ].filter(Boolean).join('\n');
 
       return { sys, user };
@@ -280,20 +236,21 @@ KURALLAR:
 - Her kartın ${topic} için ne anlattığını açıkla.
 - Kartların birlikte anlattığı hikayeyi ${topic} ekseninde ör.
 - Gerçek bir tarot yorumcusu gibi konuş.
-- Liste yapma, koçluk dili kullanma.
+- Liste yapma, madde yazma, tire kullanma.
+- Koçluk dili kullanma.
 - Sonu gizemli bitir.
 
-Türkçe yaz. Akıcı paragraflar halinde ilerle.
-${wordLimit}`;
+UZUNLUK: ${wordLimit}
+FORMAT: Sadece akıcı Türkçe paragraflar. Başlık yok, madde yok, emoji yok.`;
 
       const user = [
-        `Tarot bağlamı:`,
-        `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
+        `İsim: ${name}`,
         `Konu: ${topic}`,
+        `Gün: ${dow}`,
         `Kullanıcının sorusu: ${text || 'Belirtilmedi.'}`,
         `Kartlar:`,
         formatTarotCards(cards),
-        extraNotes,
+        `UZUNLUK KURALI: ${wordLimit}`,
       ].filter(Boolean).join('\n');
 
       return { sys, user };
@@ -308,20 +265,20 @@ KURALLAR:
 - Kalp çizgisi, kader çizgisi, akıl çizgisi ve yaşam çizgisini ${topic} açısından yorumla.
 - Elde gördüğün özel işaretleri belirt.
 - Gerçek bir el yorumcusu gibi konuş.
-- Liste yapma, koçluk dili kullanma.
+- Liste yapma, madde yazma, tire kullanma.
+- Koçluk dili kullanma.
 - Sonu gizemli bitir.
 
-Türkçe yaz. Akıcı paragraflar halinde ilerle.
-${wordLimit}`;
+UZUNLUK: ${wordLimit}
+FORMAT: Sadece akıcı Türkçe paragraflar. Başlık yok, madde yok, emoji yok.`;
 
       const user = [
-        `El çizgisi yorumu bağlamı:`,
-        `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
+        `İsim: ${name}`,
         `Konu: ${topic}`,
         `Gün: ${dow}`,
         `Kullanıcının notu: ${text || 'Belirtilmedi.'}`,
-        `Gönderilen görsel el fotoğrafıdır. Önce çizgilerin net görünüp görünmediğini kontrol et.`,
-        extraNotes,
+        `Gönderilen görsel el fotoğrafıdır. Çizgileri dikkatle incele.`,
+        `UZUNLUK KURALI: ${wordLimit}`,
       ].filter(Boolean).join('\n');
 
       return { sys, user };
@@ -336,21 +293,21 @@ KURALLAR:
 - Bu dönemdeki gezegen konumlarının ${topic} üzerindeki etkilerini yorumla.
 - Burca özgü güçlü ve hassas dönemleri belirt.
 - Gerçek bir astrolog gibi konuş.
-- Liste yapma, koçluk dili kullanma.
+- Liste yapma, madde yazma, tire kullanma.
+- Koçluk dili kullanma.
 - Şanslı gün veya enerji dönemi belirt.
 - Sonu gizemli bitir.
 
-Türkçe yaz. Akıcı paragraflar halinde ilerle.
-${wordLimit}`;
+UZUNLUK: ${wordLimit}
+FORMAT: Sadece akıcı Türkçe paragraflar. Başlık yok, madde yok, emoji yok.`;
 
       const user = [
-        `Astroloji bağlamı:`,
-        `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
+        `İsim: ${name}`,
         `Kullanıcı burcu: ${zodiac}`,
         `Konu: ${topic}`,
         `Gün: ${dow}`,
         `Kullanıcının notu: ${text || 'Belirtilmedi.'}`,
-        extraNotes,
+        `UZUNLUK KURALI: ${wordLimit}`,
       ].filter(Boolean).join('\n');
 
       return { sys, user };
@@ -365,18 +322,18 @@ KURALLAR:
 - Her sembolün ne anlama geldiğini açıkla.
 - Rüyanın genel mesajını ver.
 - Gerçek bir rüya yorumcusu gibi konuş.
-- Liste yapma, koçluk dili kullanma.
+- Liste yapma, madde yazma, tire kullanma.
+- Koçluk dili kullanma.
 - Sonu umut verici ama gizemli bitir.
 
-Türkçe yaz. Akıcı paragraflar halinde ilerle.
-${wordLimit}`;
+UZUNLUK: ${wordLimit}
+FORMAT: Sadece akıcı Türkçe paragraflar. Başlık yok, madde yok, emoji yok.`;
 
       const user = [
-        `Rüya bağlamı:`,
-        `Açılışta yalnızca bir kez kullanacağın isim: ${name}`,
-        `Rüya metni:`,
-        text || 'Belirtilmedi.',
-        extraNotes,
+        `İsim: ${name}`,
+        `Gün: ${dow}`,
+        `Rüya metni: ${text || 'Belirtilmedi.'}`,
+        `UZUNLUK KURALI: ${wordLimit}`,
       ].filter(Boolean).join('\n');
 
       return { sys, user };
@@ -388,8 +345,7 @@ ${wordLimit}`;
         .map((item) => `${item.role === 'assistant' ? 'Asistan' : 'Kullanıcı'}: ${item.text}`)
         .join('\n');
       const user = [
-        `Sohbet modu.`,
-        `Sadece cevap metnini döndür; başlık, madde listesi veya meta açıklama ekleme.`,
+        `Sohbet modu. Sadece cevap metnini döndür.`,
         transcript ? `Geçmiş:\n${transcript}` : '',
         `Son mesaj: ${text || 'Belirtilmedi.'}`,
       ].filter(Boolean).join('\n\n');
@@ -402,15 +358,17 @@ ${wordLimit}`;
     case 'motivation':
       return {
         sys: `Sen Azra'sın, günlük mistik mesajlar ileten bir rehbersin.
+
+KURALLAR:
 - İsim kullanma.
 - O günün enerjisine göre ilham verici, mistik ve kısa bir mesaj yaz.
 - Gerçek bir rehber gibi konuş.
-- Liste yapma.
+- Liste yapma, madde yazma, tire kullanma.
 - Sadece mesaj metnini üret.
 
-Türkçe yaz.
-${wordLimit}`,
-        user: `Kullanıcı adı: ${name}\nGün: ${dow}\nNot: ${text || 'Belirtilmedi.'}`,
+UZUNLUK: ${wordLimit}
+FORMAT: Sadece akıcı Türkçe paragraflar. Emoji yok.`,
+        user: `Kullanıcı adı: ${name}\nGün: ${dow}\nNot: ${text || 'Belirtilmedi.'}\nUZUNLUK KURALI: ${wordLimit}`,
       };
 
     default:
@@ -422,51 +380,12 @@ ${wordLimit}`,
 }
 
 const PROMPT_LENGTH_SAMPLES = Object.freeze({
-  coffee: {
-    profile: { name: 'Aylin' },
-    inputs: {
-      topic: 'general',
-      style: 'practical',
-      imageBase64s: ['sample-cup', 'sample-saucer'],
-    },
-  },
-  tarot: {
-    profile: { name: 'Aylin' },
-    inputs: {
-      topic: 'general',
-      style: 'practical',
-      cards: ['Deli', 'Yildiz', 'Asiklar'],
-    },
-  },
-  palm: {
-    profile: { name: 'Aylin' },
-    inputs: {
-      topic: 'general',
-      style: 'practical',
-      imageBase64: 'sample-palm',
-    },
-  },
-  astro: {
-    profile: { name: 'Aylin', zodiac: 'Akrep' },
-    inputs: {
-      topic: 'general',
-      style: 'practical',
-      zodiac: 'Akrep',
-    },
-  },
-  dream: {
-    profile: { name: 'Aylin' },
-    inputs: {
-      style: 'practical',
-      text: 'Ruyamda deniz kiyisinda yururken parlak bir yildiz gordum ve eski bir kapiyi actim.',
-    },
-  },
-  motivation: {
-    profile: { name: 'Aylin' },
-    inputs: {
-      text: 'Bugun odagimi toplamak ve sakin kalmak istiyorum.',
-    },
-  },
+  coffee: { profile: { name: 'Aylin' }, inputs: { topic: 'general', imageBase64s: ['sample-cup', 'sample-saucer'] } },
+  tarot: { profile: { name: 'Aylin' }, inputs: { topic: 'general', cards: ['Deli', 'Yildiz', 'Asiklar'] } },
+  palm: { profile: { name: 'Aylin' }, inputs: { topic: 'general', imageBase64: 'sample-palm' } },
+  astro: { profile: { name: 'Aylin', zodiac: 'Akrep' }, inputs: { topic: 'general', zodiac: 'Akrep' } },
+  dream: { profile: { name: 'Aylin' }, inputs: { text: 'Ruyamda deniz kiyisinda yururken parlak bir yildiz gordum.' } },
+  motivation: { profile: { name: 'Aylin' }, inputs: { text: 'Bugun odagimi toplamak istiyorum.' } },
 });
 
 function sampleInputCharCount(profile, inputs) {
@@ -474,8 +393,6 @@ function sampleInputCharCount(profile, inputs) {
     pickFirstString(profile?.name),
     pickFirstString(profile?.zodiac, inputs?.zodiac),
     pickFirstString(inputs?.topic),
-    pickFirstString(inputs?.style),
-    pickFirstString(inputs?.styleHintTr),
     pickFirstString(inputs?.text),
     ...normalizeCards(inputs?.cards),
   ].filter(Boolean);
@@ -491,13 +408,7 @@ function sampleImageCount(inputs) {
 function buildPromptLengthSummary() {
   return Object.fromEntries(
     Object.entries(PROMPT_LENGTH_SAMPLES).map(([type, sample]) => {
-      const { sys, user } = buildPrompt({
-        type,
-        profile: sample.profile,
-        inputs: sample.inputs,
-        locale: 'tr-TR',
-      });
-
+      const { sys, user } = buildPrompt({ type, profile: sample.profile, inputs: sample.inputs, locale: 'tr-TR' });
       return [type, {
         systemChars: sys.length,
         userChars: user.length,
@@ -530,44 +441,27 @@ function normalizeImagePart(value) {
   if (typeof value !== 'string' || !value.trim()) return null;
   const trimmed = value.trim();
   const dataUrlMatch = trimmed.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (dataUrlMatch) {
-    return {
-      mimeType: dataUrlMatch[1],
-      data: dataUrlMatch[2],
-    };
-  }
-  return {
-    mimeType: guessMimeType(trimmed),
-    data: trimmed,
-  };
+  if (dataUrlMatch) return { mimeType: dataUrlMatch[1], data: dataUrlMatch[2] };
+  return { mimeType: guessMimeType(trimmed), data: trimmed };
 }
 
 function buildGeminiParts({ user, inputs }) {
   const parts = [{ text: user }];
   const rawImages = [];
   const imageList = Array.isArray(inputs?.imageBase64s) ? inputs.imageBase64s : [];
-
   for (const item of imageList) {
     if (typeof item === 'string' && item.trim()) rawImages.push(item.trim());
   }
-
   if (typeof inputs?.imageBase64 === 'string' && inputs.imageBase64.trim()) {
     rawImages.push(inputs.imageBase64.trim());
   }
-
   const seen = new Set();
   for (const rawImage of rawImages) {
     const imagePart = normalizeImagePart(rawImage);
     if (!imagePart || seen.has(imagePart.data)) continue;
     seen.add(imagePart.data);
-    parts.push({
-      inlineData: {
-        mimeType: imagePart.mimeType,
-        data: imagePart.data,
-      },
-    });
+    parts.push({ inlineData: { mimeType: imagePart.mimeType, data: imagePart.data } });
   }
-
   return parts;
 }
 
@@ -583,14 +477,11 @@ function geminiUsageToOpenAI(usageMetadata) {
 function extractGeminiText(data) {
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) return '';
-  return parts
-    .map((part) => (typeof part?.text === 'string' ? part.text : ''))
-    .join('')
-    .trim();
+  return parts.map((part) => (typeof part?.text === 'string' ? part.text : '')).join('').trim();
 }
 
 function logResponseStats(type, text) {
-  const wordCount = text.split(' ').length;
+  const wordCount = text.split(/\s+/).length;
   const charCount = text.length;
   console.log(`[${type}] words:${wordCount} chars:${charCount} tokens:${Math.round(charCount / 4)}`);
 }
@@ -610,28 +501,13 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
   const mergedProfile = resolveProfile(profile, body);
   const mergedInputs = resolveInputs(inputs, body);
   const normalizedType = normalizeReadingType(type);
-  const { sys, user } = buildPrompt({
-    type: normalizedType,
-    profile: mergedProfile,
-    inputs: mergedInputs,
-    locale,
-  });
+  const { sys, user } = buildPrompt({ type: normalizedType, profile: mergedProfile, inputs: mergedInputs, locale });
 
-  const temp = (typeof body?.temperature === 'number')
-    ? body.temperature
-    : ((normalizedType === 'dream') ? 0.3 : 0.85);
+  const temp = (typeof body?.temperature === 'number') ? body.temperature : 0.85;
 
-  // Gemini expects systemInstruction + contents, not OpenAI-style messages.
   const payload = {
-    systemInstruction: {
-      parts: [{ text: sys }],
-    },
-    contents: [
-      {
-        role: 'user',
-        parts: buildGeminiParts({ user, inputs: mergedInputs }),
-      },
-    ],
+    systemInstruction: { parts: [{ text: sys }] },
+    contents: [{ role: 'user', parts: buildGeminiParts({ user, inputs: mergedInputs }) }],
     generationConfig: {
       temperature: temp,
       maxOutputTokens: getMaxOutputTokens(normalizedType),
@@ -647,34 +523,23 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
   for (let index = 0; index < GEMINI_MODELS.length; index += 1) {
     const modelName = GEMINI_MODELS[index];
     selectedModel = modelName;
-
     try {
       const resp = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-          },
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
           body: JSON.stringify(payload),
         },
       );
-
       const raw = await resp.text();
-      try {
-        data = raw ? JSON.parse(raw) : {};
-      } catch (_) {
-        data = { raw };
-      }
-
+      try { data = raw ? JSON.parse(raw) : {}; } catch (_) { data = { raw }; }
       if (!resp.ok) {
         const err = new Error(data?.error?.message || raw || 'gemini_error');
         err.status = resp.status;
         err.response = { data };
         throw err;
       }
-
       text = extractGeminiText(data);
       if (!text) {
         const err = new Error(data?.promptFeedback?.blockReason || 'empty_gemini_response');
@@ -682,7 +547,6 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
         err.response = { data };
         throw err;
       }
-
       usage = geminiUsageToOpenAI(data?.usageMetadata);
       break;
     } catch (err) {
@@ -697,51 +561,18 @@ async function generateWithGemini({ type, profile, inputs, locale, body }) {
     }
   }
 
-  if (!text) {
-    throw lastError || new Error('gemini_fallback_failed');
-  }
+  if (!text) throw lastError || new Error('gemini_fallback_failed');
 
-  return {
-    text,
-    usage,
-    raw: data,
-    debug: {
-      modelUsed: selectedModel,
-      normalizedType,
-    },
-  };
+  return { text, usage, raw: data, debug: { modelUsed: selectedModel, normalizedType } };
 }
 
 app.post('/generate', async (req, res) => {
   try {
     const { type, profile, inputs, locale } = req.body || {};
-    const r = await generateWithGemini({
-      type,
-      profile,
-      inputs,
-      locale,
-      body: req.body || {},
-    });
+    const r = await generateWithGemini({ type, profile, inputs, locale, body: req.body || {} });
     console.log('GEMINI_MODEL_USED:', r.debug.modelUsed || '');
     console.log('USAGE:', JSON.stringify(r.usage));
     logResponseStats(type, r.text);
-
-    /*
-    // OpenAI request kept commented for future provider work.
-    const client = getClient();
-    const r = await client.chat.completions.create({
-      model: model || 'gpt-4o-mini',
-      temperature: temp,
-      presence_penalty: presence,
-      frequency_penalty: frequency,
-      messages: [
-        { role: 'system', content: sys },
-        { role: 'user', content: user }
-      ],
-    });
-    console.log('USAGE:', JSON.stringify(r.usage));
-    */
-
     res.json({ text: r.text });
   } catch (e) {
     const status = e?.status || e?.response?.status || 500;
@@ -755,38 +586,13 @@ app.post('/stream', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   const send = (data) => res.write(`data: ${data}\n\n`);
-
   try {
     const { type, profile, inputs, locale } = req.body || {};
-    const r = await generateWithGemini({
-      type,
-      profile,
-      inputs,
-      locale,
-      body: req.body || {},
-    });
+    const r = await generateWithGemini({ type, profile, inputs, locale, body: req.body || {} });
     console.log('USAGE:', JSON.stringify(r.usage));
     logResponseStats(type, r.text);
-
-    /*
-    // OpenAI streaming kept commented for future provider work.
-    const stream = await client.chat.completions.create({
-      model: model || 'gpt-4o-mini',
-      temperature: temp,
-      presence_penalty: presence,
-      frequency_penalty: frequency,
-      stream: true,
-      messages: [
-        { role: 'system', content: sys },
-        { role: 'user', content: user }
-      ],
-    });
-    */
-
     const chunks = r.text.match(/\S+\s*/g) || (r.text ? [r.text] : []);
-    for (const delta of chunks) {
-      if (delta) send(JSON.stringify({ delta }));
-    }
+    for (const delta of chunks) { if (delta) send(JSON.stringify({ delta })); }
     send('[DONE]');
     res.end();
   } catch (e) {
@@ -805,17 +611,9 @@ app.listen(PORT, () => {
 
 app.get('/health', (req, res) => {
   const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim());
-  res.json({
-    ok: true,
-    provider: 'gemini',
-    model: GEMINI_MODELS[0],
-    fallbackModels: GEMINI_MODELS,
-    hasApiKey: hasKey,
-    promptLengths: PROMPT_LENGTH_SUMMARY,
-  });
+  res.json({ ok: true, provider: 'gemini', model: GEMINI_MODELS[0], fallbackModels: GEMINI_MODELS, hasApiKey: hasKey, promptLengths: PROMPT_LENGTH_SUMMARY });
 });
 
 setInterval(() => {
-  fetch('https://mystiq-pdxf.onrender.com/health')
-    .catch(() => {});
+  fetch('https://mystiq-pdxf.onrender.com/health').catch(() => {});
 }, 14 * 60 * 1000);
