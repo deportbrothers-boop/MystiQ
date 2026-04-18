@@ -214,5 +214,8 @@
   "ai.template.astro": "{name}, burcun {zodiac} için bugün nazik ama net bir yön beliriyor.",
   "ai.template.dream": "{name}, \"{text}\" rüyan için gün içinde iki küçük işaret ara ve kısaca not al.",
   "ai.template.palm": "{name}, el çizgilerin {dow} gününde dengeli bir yön gösteriyor. Nazik ama net bir adım at.",
-  "ai.template.coffee": "{name}, fincandaki izler {dow} akışıyla uyumlu. Konu: {topic}. Bugün küçük ve somut bir adım iyi gelir."
+  "ai.template.coffee": "{name}, fincandaki izler {dow} akışıyla uyumlu. Konu: {topic}. Bugün küçük ve somut bir adım iyi gelir.",
+  "rewards.streak.day": "Gün {day}/7",
+  "rewards.streak.reward": "7 gün tamamlandı! 30 coin kazandın!",
+  "rewards.streak.checkedin": "Bugün giriş yapıldı"
 }
