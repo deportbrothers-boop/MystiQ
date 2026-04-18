@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -22,14 +21,50 @@ import '../../core/access/sku_costs.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  bool _didRecordDailyLogin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recordDailyLoginIfNeeded();
+    });
+  }
+
+  Future<void> _recordDailyLoginIfNeeded() async {
+    if (_didRecordDailyLogin || !mounted) return;
+    _didRecordDailyLogin = true;
+
+    final rewards = context.read<RewardsController>();
+    final ent = context.read<EntitlementsController>();
+
+    try {
+      await rewards.load();
+      if (rewards.checkedInToday()) return;
+
+      final result = await rewards.recordDailyLogin(ent);
+      if (!mounted) return;
+      if (result['rewardEarned'] == true) {
+        final loc = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('rewards.streak.reward'))),
+        );
+      }
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ent = context.watch<EntitlementsController>();
+    final ent = context.read<EntitlementsController>();
     final loc = AppLocalizations.of(context);
-    final rewards = context.watch<RewardsController>();
     final hist = context.watch<HistoryController>();
     final profileCtrl = context.watch<ProfileController>();
     final lc = context.watch<LocaleController>();
@@ -93,12 +128,14 @@ class ProfilePage extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Energy
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.bolt),
-              title: Text(loc.t('profile.energy')),
-              subtitle: GoldBar(value: (ent.energy.clamp(0, 100)) / 100),
-              trailing: Text('${ent.energy}%'),
+          Consumer<EntitlementsController>(
+            builder: (context, ent, _) => Card(
+              child: ListTile(
+                leading: const Icon(Icons.bolt),
+                title: Text(loc.t('profile.energy')),
+                subtitle: GoldBar(value: (ent.energy.clamp(0, 100)) / 100),
+                trailing: Text('${ent.energy}%'),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -124,12 +161,42 @@ class ProfilePage extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Wallet
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.monetization_on_outlined),
-              title: Text(loc.t('profile.wallet')),
-              trailing: Text('${ent.coins}'),
+          Consumer<EntitlementsController>(
+            builder: (context, ent, _) => Card(
+              child: ListTile(
+                leading: const Icon(Icons.monetization_on_outlined),
+                title: Text(loc.t('profile.wallet')),
+                trailing: Text('${ent.coins}'),
+              ),
             ),
+          ),
+          const SizedBox(height: 12),
+
+          Consumer<RewardsController>(
+            builder: (context, rewards, _) {
+              final streakCount = rewards.streakCount;
+              final checkedInToday = rewards.checkedInToday();
+              final streakText = streakCount == 0 && checkedInToday
+                  ? loc.t('rewards.streak.checkedin')
+                  : loc.t('rewards.streak.day')
+                      .replaceAll('{day}', streakCount.toString());
+
+              return Card(
+                child: ListTile(
+                  leading: const Text(
+                    '\u{1F525}',
+                    style: TextStyle(fontSize: 22),
+                  ),
+                  title: Text(streakText),
+                  trailing: Text(
+                    '$streakCount',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
 
@@ -151,7 +218,7 @@ class ProfilePage extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Arkadasini getir – 1 yorum hakki kazan', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const Text('Arkadasini getir Ã¢â‚¬â€œ 1 yorum hakki kazan', style: TextStyle(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 6),
                         Row(children: [
                           Expanded(child: SelectableText(code, style: const TextStyle(fontSize: 16))),
@@ -182,7 +249,7 @@ class ProfilePage extends StatelessWidget {
                 },
               );
             },
-            label: const Text('Arkadasini getir – 1 yorum hakki kazan'),
+            label: const Text('Arkadasini getir Ã¢â‚¬â€œ 1 yorum hakki kazan'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -219,33 +286,21 @@ class ProfilePage extends StatelessWidget {
           ElevatedButton(onPressed: () => context.push('/paywall'), child: const Text('Coin Kazan')),
           const SizedBox(height: 8),
 
-          // Daily reward
-          ElevatedButton(
-            onPressed: rewards.canClaimDaily()
-                ? () async {
-                    final ok = await rewards.claimDaily(ent);
-                    if (ok && context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(loc.t('rewards.daily.snack'))));
-                    }
-                  }
-                : null,
-            child: Text(loc.t('rewards.daily.button')),
-          ),
-          const SizedBox(height: 8),
-
           // Weekly reward
-          ElevatedButton(
-            onPressed: rewards.canClaimWeekly(hist)
-                ? () async {
-                    final ok = await rewards.claimWeekly(ent, hist);
-                    if (ok && context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(loc.t('rewards.weekly.snack'))));
+          Consumer<RewardsController>(
+            builder: (context, rewards, _) => ElevatedButton(
+              onPressed: rewards.canClaimWeekly(hist)
+                  ? () async {
+                      final ok = await rewards.claimWeekly(ent, hist);
+                      if (ok && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(loc.t('rewards.weekly.snack'))),
+                        );
+                      }
                     }
-                  }
-                : null,
-            child: Text(loc.t('rewards.weekly.button')),
+                  : null,
+              child: Text(loc.t('rewards.weekly.button')),
+            ),
           ),
           const SizedBox(height: 8),
 
@@ -303,7 +358,7 @@ class ProfilePage extends StatelessWidget {
           // Sign out
           ElevatedButton.icon(
             icon: const Icon(Icons.logout),
-            label: const Text('Çıkış Yap'),
+            label: const Text('Ãƒâ€¡Ã„Â±kÃ„Â±Ã…Å¸ Yap'),
             onPressed: () async {
               try {
                 final prefs = await SharedPreferences.getInstance();
@@ -312,7 +367,7 @@ class ProfilePage extends StatelessWidget {
               } catch (_) {}
               try { await FirebaseAuth.instance.signOut(); } catch (_) {}
               if (context.mounted) {
-                // root’a dön ve auth’a git
+                // rootÃ¢â‚¬â„¢a dÃƒÂ¶n ve authÃ¢â‚¬â„¢a git
                 context.go('/auth');
               }
             },
@@ -366,7 +421,7 @@ List<_Element> _distributionForZodiac(String zodiac) {
 
   if (isFire || isEarth || isAir || isWater) {
     // Primary element dominates; allied gets secondary weight
-    // Allies: Fire↔Air, Earth↔Water
+    // Allies: FireÃ¢â€ â€Air, EarthÃ¢â€ â€Water
     const p = 0.58; // primary
     const s = 0.22; // allied
     const r = 0.10; // others
@@ -392,17 +447,17 @@ List<_Element> _distributionForZodiac(String zodiac) {
 String _norm(String s) {
   var t = s.trim().toLowerCase();
   const pairs = <String, String>{
-    '\u00E7': 'c', // ç
-    '\u011F': 'g', // ğ
-    '\u0131': 'i', // ı
-    '\u0130': 'i', // İ
-    'i\u0307': 'i', // i̇ (i + dot)
-    '\u00F6': 'o', // ö
-    '\u015F': 's', // ş
-    '\u00FC': 'u', // ü
-    '\u00E2': 'a', // â
-    '\u00EE': 'i', // î
-    '\u00FB': 'u', // û
+    '\u00E7': 'c', // ÃƒÂ§
+    '\u011F': 'g', // Ã„Å¸
+    '\u0131': 'i', // Ã„Â±
+    '\u0130': 'i', // Ã„Â°
+    'i\u0307': 'i', // iÃŒâ€¡ (i + dot)
+    '\u00F6': 'o', // ÃƒÂ¶
+    '\u015F': 's', // Ã…Å¸
+    '\u00FC': 'u', // ÃƒÂ¼
+    '\u00E2': 'a', // ÃƒÂ¢
+    '\u00EE': 'i', // ÃƒÂ®
+    '\u00FB': 'u', // ÃƒÂ»
   };
   pairs.forEach((k, v) => t = t.replaceAll(k, v));
   return t;
