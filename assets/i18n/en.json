@@ -205,8 +205,6 @@
     "reading.eta_prefix":  "Estimated time:",
     "reading.preparing":  "Preparing reading",
     "reading.result.title":  "Reading Result",
-    "rewards.daily.button":  "Claim Daily Reward (+10 coins)",
-    "rewards.daily.snack":  "You earned 10 coins!",
     "rewards.weekly.button":  "Weekly Quest: 3 readings +1 free",
     "rewards.weekly.snack":  "You won 1 free reading!",
     "settings.chat_prefs.selection_prefix":  "Your choice:",
@@ -283,5 +281,11 @@
     "sku.coin.500.label":  "Standard (500 +50)",
     "sku.coin.1200.label":  "Large (1200 +200)",
     "sku.coin.3000.label":  "Mega (3000 +600)",
-    "sku.coin.7000.label":  "Mystic (7000 +1000)"
+    "sku.coin.7000.label":  "Mystic (7000 +1000)",
+    "rewards.streak.day":  "Day {day}/7",
+    "rewards.streak.reward":  "7 days complete! You earned 30 coins!",
+    "rewards.streak.checkedin":  "Already checked in today"
 }
+
+
+

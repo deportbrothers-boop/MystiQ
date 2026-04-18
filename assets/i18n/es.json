@@ -157,8 +157,6 @@
   "reading.eta_prefix": "Tiempo estimado:",
   "reading.preparing": "Preparando lectura",
   "reading.result.title": "Resultado de la lectura",
-  "rewards.daily.button": "Recibir recompensa diaria (+10 monedas)",
-  "rewards.daily.snack": "Ã‚¡Ganaste 10 monedas!",
   "rewards.weekly.button": "MisiÃƒ³n semanal: 3 lecturas +1 gratis",
   "rewards.weekly.snack": "Ã‚¡Ganaste 1 lectura gratis!",
   "settings.chat_prefs.selection_prefix": "Tu elecciÃƒ³n:",
@@ -270,5 +268,10 @@
   "live.astro_note": "Nota astro: el elemento {elem} apoya tu intuición hoy.",
   "live.disclaimer": "Nota: Este chat es de entretenimiento; usa tu criterio y consulta profesionales cuando sea necesario.",
   "deep.upsell.title": "Profundiza tu resultado",
-  "deep.upsell.body": "Para explicaciones más ricas y propuestas de seguimiento, pasa a Premium o realiza una compra única."
+  "deep.upsell.body": "Para explicaciones más ricas y propuestas de seguimiento, pasa a Premium o realiza una compra única.",
+  "rewards.streak.day": "Día {day}/7",
+  "rewards.streak.reward": "¡7 días completados! ¡Ganaste 30 monedas!",
+  "rewards.streak.checkedin": "Ya registrado hoy"
 }
+
+
