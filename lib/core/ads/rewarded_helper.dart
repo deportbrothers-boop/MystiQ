@@ -3,13 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'ad_service.dart';
 import 'dart:io';
+import '../entitlements/entitlements_controller.dart';
 
 class RewardedAds {
   // Production rewarded ad unit ids
   static const String _androidUnit = 'ca-app-pub-4678612524495888/4461067330';
   static const String _iosUnit = 'ca-app-pub-4678612524495888/8396442918';
+  static EntitlementsController? _entitlements;
+
+  static void init(EntitlementsController ent) {
+    _entitlements = ent;
+  }
 
   static Future<bool> show({required BuildContext context, String? adUnitId}) async {
+    final entCtrl = RewardedAds._entitlements;
+    if (entCtrl != null && entCtrl.isPremium) return true;
     final completer = Completer<bool>();
     bool retried = false;
     var earned = false;
@@ -85,6 +93,8 @@ class RewardedAds {
     required int count,
     String? key,
   }) async {
+    final entCtrl = RewardedAds._entitlements;
+    if (entCtrl != null && entCtrl.isPremium) return true;
     if (count <= 0) return true;
     for (var i = 0; i < count; i++) {
       final ok = await show(context: context);

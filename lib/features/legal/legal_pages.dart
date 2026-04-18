@@ -35,8 +35,7 @@ class _DocPage extends StatelessWidget {
 const _terms =
     'Falla, eğlence amaçlıdır ve sağlık/finansal tavsiye içermez. '
     'Uygulamayı kullanarak yerel yasalara uymayı kabul edersiniz. '
-    'Bu uygulamada ücretli satın alım yoktur; coin yalnızca reklam izleyerek kazanılır.';
-
+    'Coin; reklam izleyerek veya uygulama içi satın alımlarla kazanılabilir.';
 const _privacy = '''
 Falla - Gizlilik Politikası
 
