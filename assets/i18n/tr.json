@@ -1,6 +1,6 @@
 {
   "app.name": "Falla",
-  "nav.coffee": "Kahve Yorumu",
+  "nav.coffee": "Kahve Falı",
   "nav.profile": "Profil",
   "common.language": "Dil",
   "common.notifications": "Bildirimler",
@@ -170,7 +170,7 @@
   "coffee.fast.watch_ad": "Reklam izle (5 dk)",
   "action.cancel": "İptal",
   "coffee.style.title": "Stil",
-  "coffee.title": "Kahve Yorumu",
+  "coffee.title": "Kahve Falı",
   "tarot.style.title": "Stil",
   "palm.style.practical": "Pratik",
   "coffee.style.spiritual": "Spiritüel",
