@@ -218,15 +218,15 @@ class _ProfilePageState extends State<ProfilePage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Arkadasini getir Ã¢â‚¬â€œ 1 yorum hakki kazan', style: TextStyle(fontWeight: FontWeight.w700)),
+                        const Text('Arkadaşını getir – 1 yorum hakkı kazan', style: TextStyle(fontWeight: FontWeight.w700)),
                         const SizedBox(height: 6),
                         Row(children: [
                           Expanded(child: SelectableText(code, style: const TextStyle(fontSize: 16))),
                           const SizedBox(width: 8),
-                          OutlinedButton(onPressed: () async { await ReferralService.shareMyCode(ctx); }, child: const Text('Paylas')),
+                          OutlinedButton(onPressed: () async { await ReferralService.shareMyCode(ctx); }, child: const Text('Paylaş')),
                         ]),
                         const SizedBox(height: 12),
-                        const Text('Arkadas kodu gir:'),
+                        const Text('Arkadaş kodu gir:'),
                         const SizedBox(height: 6),
                         TextField(controller: ctrl, decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'KOD')), 
                         const SizedBox(height: 8),
@@ -237,7 +237,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               final ok = await ReferralService.redeemReferral(code: ctrl.text, ent: ent);
                               if (ctx.mounted) {
                                 Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? '+1 yorum hakki (${SkuCosts.coffeeFast} coin) verildi' : 'Kod kullanilamadi')));
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? '+1 yorum hakkı (${SkuCosts.coffeeFast} coin) verildi' : 'Kod kullanılamadı')));
                               }
                             },
                             child: const Text('Kullan'),
@@ -249,7 +249,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
               );
             },
-            label: const Text('Arkadasini getir Ã¢â‚¬â€œ 1 yorum hakki kazan'),
+            label: const Text('Arkadaşını getir – 1 yorum hakkı kazan'),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -260,15 +260,15 @@ class _ProfilePageState extends State<ProfilePage> {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text('Promosyon Kodu'),
-                  content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'Kodu gir (1 kez, 1 yorum hakki)')),
+                  content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'Kodu gir (1 kez, 1 yorum hakkı)')),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Iptal')),
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('İptal')),
                     ElevatedButton(
                       onPressed: () async {
                         final ok = await ReferralService.redeemPromo(code: ctrl.text, ent: ent);
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Promosyon: +1 yorum hakki (${SkuCosts.coffeeFast} coin) verildi' : 'Gecersiz kod veya daha once kullanildi')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Promosyon: +1 yorum hakkı (${SkuCosts.coffeeFast} coin) verildi' : 'Geçersiz kod veya daha önce kullanıldı')));
                         }
                       },
                       child: const Text('Kullan'),
@@ -358,7 +358,7 @@ class _ProfilePageState extends State<ProfilePage> {
           // Sign out
           ElevatedButton.icon(
             icon: const Icon(Icons.logout),
-            label: const Text('Ãƒâ€¡Ã„Â±kÃ„Â±Ã…Å¸ Yap'),
+            label: const Text('Çıkış Yap'),
             onPressed: () async {
               try {
                 final prefs = await SharedPreferences.getInstance();
@@ -367,7 +367,7 @@ class _ProfilePageState extends State<ProfilePage> {
               } catch (_) {}
               try { await FirebaseAuth.instance.signOut(); } catch (_) {}
               if (context.mounted) {
-                // rootÃ¢â‚¬â„¢a dÃƒÂ¶n ve authÃ¢â‚¬â„¢a git
+                // Root'a dön ve auth'a git
                 context.go('/auth');
               }
             },
@@ -421,7 +421,7 @@ List<_Element> _distributionForZodiac(String zodiac) {
 
   if (isFire || isEarth || isAir || isWater) {
     // Primary element dominates; allied gets secondary weight
-    // Allies: FireÃ¢â€ â€Air, EarthÃ¢â€ â€Water
+    // Allies: Fire -> Air, Earth -> Water
     const p = 0.58; // primary
     const s = 0.22; // allied
     const r = 0.10; // others
@@ -447,17 +447,17 @@ List<_Element> _distributionForZodiac(String zodiac) {
 String _norm(String s) {
   var t = s.trim().toLowerCase();
   const pairs = <String, String>{
-    '\u00E7': 'c', // ÃƒÂ§
-    '\u011F': 'g', // Ã„Å¸
-    '\u0131': 'i', // Ã„Â±
-    '\u0130': 'i', // Ã„Â°
-    'i\u0307': 'i', // iÃŒâ€¡ (i + dot)
-    '\u00F6': 'o', // ÃƒÂ¶
-    '\u015F': 's', // Ã…Å¸
-    '\u00FC': 'u', // ÃƒÂ¼
-    '\u00E2': 'a', // ÃƒÂ¢
-    '\u00EE': 'i', // ÃƒÂ®
-    '\u00FB': 'u', // ÃƒÂ»
+    '\u00E7': 'c', // c-cedilla
+    '\u011F': 'g', // g-breve
+    '\u0131': 'i', // dotless i
+    '\u0130': 'i', // uppercase dotted I
+    'i\u0307': 'i', // i + combining dot
+    '\u00F6': 'o', // o-umlaut
+    '\u015F': 's', // s-cedilla
+    '\u00FC': 'u', // u-umlaut
+    '\u00E2': 'a', // a-circumflex
+    '\u00EE': 'i', // i-circumflex
+    '\u00FB': 'u', // u-circumflex
   };
   pairs.forEach((k, v) => t = t.replaceAll(k, v));
   return t;

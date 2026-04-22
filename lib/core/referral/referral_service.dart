@@ -43,7 +43,7 @@ class ReferralService {
 
   static Future<void> shareMyCode(BuildContext context) async {
     final code = await myCode();
-    final msg = 'Falla referans kodum: $code\nKullan, 1 yorum hakki kazan!';
+    final msg = 'Falla referans kodum: $code\nKullan, 1 yorum hakkı kazan!';
     await Share.share(msg, subject: 'Falla Referans Kodu');
   }
 
