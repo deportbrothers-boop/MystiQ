@@ -505,7 +505,7 @@ class _ReadingResultPageState extends State<ReadingResultPage> {
   String _appendTarotOutro(String base, String name) {
     final who = name.trim().isEmpty ? '' : (name.trim() + ', ');
     const outro = 'kartlardaki semboller, tematik bir bakisla yorumlanabilir.\n'
-        'Bu yorum eglence amaclidir; kendi sezgini de referans al.';
+        'Bu içerik eğlence amaçlıdır; kesinlik içermez.';
     final header = who.isEmpty ? '' : who;
     final add = header + outro;
     final trimmed = base.trimRight();
